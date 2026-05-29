@@ -1,6 +1,8 @@
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { LogOut, Zap, Flame, BookOpen, Trophy } from 'lucide-react'
+import { getUserBadge, getAllBadges } from '../../utils/badges'
+import MascotTip from '../../components/ui/MascotTip'
 
 const ACHIEVEMENTS = [
   { id: 1, emoji: '🌱', title: 'Primeiro Passo', desc: 'Completou a primeira lição', done: true },
@@ -26,6 +28,8 @@ const profileLabels: Record<string, { label: string; emoji: string; color: strin
   ARROJADO:     { label: 'Arrojado',     emoji: '🚀', color: 'bg-orange-50 text-orange-700' },
 }
 
+const allBadges = getAllBadges()
+
 export default function ProfilePage() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -35,9 +39,19 @@ export default function ProfilePage() {
     ? Math.min(100, (user.totalXp / level.nextXp) * 100)
     : 100
 
+  const badge = getUserBadge({
+    xp: user?.totalXp ?? 0,
+    streak: user?.streakDays ?? 0,
+    lessonsCompleted: user?.lessonsCompleted ?? 0,
+    investorProfile: user?.investorProfile ?? 'NAO_DEFINIDO',
+  })
+
   return (
     <div className="space-y-6 pb-20 md:pb-0">
       <h1 className="text-2xl font-bold text-gray-900">Meu Perfil</h1>
+
+      {/* ── Mascote com dica cômica */}
+      <MascotTip tip={badge.tip} />
 
       {/* ── Avatar e info */}
       <div className="card flex items-center gap-5">
@@ -50,6 +64,16 @@ export default function ProfilePage() {
           <span className={`inline-block mt-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${profile.color}`}>
             {profile.emoji} {profile.label}
           </span>
+        </div>
+      </div>
+
+      {/* ── Selo atual */}
+      <div className={`card border flex items-center gap-4 ${badge.bg}`}>
+        <span className="text-4xl">{badge.emoji}</span>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-0.5">Seu selo atual</p>
+          <p className={`text-base font-bold ${badge.color}`}>{badge.title}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{badge.desc}</p>
         </div>
       </div>
 
@@ -92,6 +116,35 @@ export default function ProfilePage() {
             <p className="text-xl font-bold text-gray-900 mt-0.5">{value}</p>
           </div>
         ))}
+      </div>
+
+      {/* ── Todos os selos */}
+      <div>
+        <h2 className="text-lg font-bold text-gray-900 mb-3">Galeria de Selos</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {allBadges.map((b) => {
+            const unlocked = b.id === badge.id
+            return (
+              <div
+                key={b.id}
+                className={`card border flex items-center gap-3 transition-opacity ${
+                  unlocked ? b.bg : 'opacity-40 grayscale border-gray-100'
+                }`}
+              >
+                <span className="text-2xl">{b.emoji}</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-gray-900 truncate">{b.title}</p>
+                  <p className="text-xs text-gray-500 truncate">{b.character}</p>
+                  {unlocked && (
+                    <span className="inline-block mt-1 text-[10px] font-bold text-primary bg-primary-muted px-1.5 py-0.5 rounded-full">
+                      Você!
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* ── Conquistas */}

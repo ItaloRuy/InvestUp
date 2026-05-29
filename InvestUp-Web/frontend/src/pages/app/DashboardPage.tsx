@@ -1,6 +1,8 @@
 import { useAuth } from '../../contexts/AuthContext'
 import { Link } from 'react-router-dom'
 import { BookOpen, TrendingUp, Zap, Flame, Trophy } from 'lucide-react'
+import MascotTip from '../../components/ui/MascotTip'
+import { getUserBadge } from '../../utils/badges'
 
 const TRAIL_PROGRESS = [
   { id: 1, name: 'Fundamentos', emoji: '🌱', progress: 60, total: 5, done: 3, color: 'bg-primary' },
@@ -14,8 +16,30 @@ const RECENT_LESSONS = [
   { id: '1.2', title: 'Risco x Retorno',               emoji: '⚖️', status: 'completed' as const },
 ]
 
+function getDashboardTip(xp: number, streak: number, investorProfile: string): string {
+  if (xp === 0) return 'Ei, seu dinheiro tá parado na conta. Ele tá triste. Muito triste. Vamos aprender a investir?'
+  if (streak === 0) return 'Você sumiu! Eu quase fui contar pro Neymar que você abandonou os investimentos.'
+  if (streak >= 7 && investorProfile === 'CONSERVADOR') return 'Julius do "Todo Mundo Odeia o Chris" viu seu histórico e disse: "Esse menino sabe o que faz."'
+  if (xp >= 2500 && investorProfile === 'ARROJADO') return 'Cuidado! Com esse perfil arrojado o Tio Patinhas vai querer recrutar você pro cofre dele.'
+  if (streak >= 3) return `${streak} dias seguidos! O Seu Madruga tá com inveja.`
+  return 'Seu dinheiro quer crescer. Só depende de você. Sem desculpas.'
+}
+
 export default function DashboardPage() {
   const { user } = useAuth()
+
+  const badge = getUserBadge({
+    xp: user?.totalXp ?? 0,
+    streak: user?.streakDays ?? 0,
+    lessonsCompleted: user?.lessonsCompleted ?? 0,
+    investorProfile: user?.investorProfile ?? 'NAO_DEFINIDO',
+  })
+
+  const dashTip = getDashboardTip(
+    user?.totalXp ?? 0,
+    user?.streakDays ?? 0,
+    user?.investorProfile ?? 'NAO_DEFINIDO',
+  )
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
@@ -29,6 +53,15 @@ export default function DashboardPage() {
             ? `🔥 ${user.streakDays} dias seguidos. Continue assim!`
             : 'Comece sua jornada de investimentos hoje!'}
         </p>
+      </div>
+
+      {/* ── Mascote com dica cômica + selo atual */}
+      <div className="space-y-2">
+        <MascotTip tip={dashTip} />
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium ${badge.bg} ${badge.color}`}>
+          <span>{badge.emoji}</span>
+          <span>Seu selo: <strong>{badge.title}</strong> — {badge.character}</span>
+        </div>
       </div>
 
       {/* ── Cards de stats */}

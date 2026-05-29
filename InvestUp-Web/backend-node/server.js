@@ -72,8 +72,17 @@ db.exec(`
 // ── Seed de usuários padrão
 function seedUsers() {
   const seeds = [
-    { name: 'Demo InvestUp', email: 'demo@investup.com',  password: 'demo123',  xp: 450,  streak: 7,  lessons: 5 },
-    { name: 'Italo',         email: 'italoruy1@gmail.com', password: 'teste123', xp: 0,    streak: 0,  lessons: 0 },
+    // Usuários originais
+    { name: 'Demo InvestUp', email: 'demo@investup.com',     password: 'demo123',  profile: 'NAO_DEFINIDO', xp: 450,   streak: 7,  lessons: 5  },
+    { name: 'Italo',         email: 'italoruy1@gmail.com',   password: 'teste123', profile: 'NAO_DEFINIDO', xp: 0,     streak: 0,  lessons: 0  },
+
+    // Demo — cada selo
+    { name: 'Tio Patinhas',  email: 'patinhas@demo.com',     password: 'demo123',  profile: 'MODERADO',     xp: 12000, streak: 30, lessons: 40 }, // 🎩 Cofre de Ouro
+    { name: 'Gordon Gekko',  email: 'gekko@demo.com',        password: 'demo123',  profile: 'ARROJADO',     xp: 3500,  streak: 10, lessons: 18 }, // 📈 A Ganância é Boa
+    { name: 'Julius',        email: 'julius@demo.com',       password: 'demo123',  profile: 'CONSERVADOR',  xp: 800,   streak: 14, lessons: 10 }, // 🧾 Mestre da Economia
+    { name: 'Tartaruga',     email: 'tartaruga@demo.com',    password: 'demo123',  profile: 'MODERADO',     xp: 400,   streak: 21, lessons: 6  }, // 🐢 Devagar e Sempre
+    { name: 'Seu Madruga',   email: 'madruga@demo.com',      password: 'demo123',  profile: 'NAO_DEFINIDO', xp: 0,     streak: 0,  lessons: 0  }, // 😅 Sem Fundos
+    { name: 'Iniciante',     email: 'iniciante@demo.com',    password: 'demo123',  profile: 'MODERADO',     xp: 250,   streak: 2,  lessons: 3  }, // 🌱 Começando a Jornada
   ]
 
   for (const s of seeds) {
@@ -81,10 +90,10 @@ function seedUsers() {
     if (!exists) {
       const hash = bcrypt.hashSync(s.password, 10)
       db.prepare(`
-        INSERT INTO users (name, email, password, total_xp, streak_days, lessons_completed, last_login_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-      `).run(s.name, s.email, hash, s.xp, s.streak, s.lessons)
-      console.log(`🌱 Usuário criado: ${s.email}`)
+        INSERT INTO users (name, email, password, investor_profile, total_xp, streak_days, lessons_completed, last_login_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `).run(s.name, s.email, hash, s.profile, s.xp, s.streak, s.lessons)
+      console.log(`🌱 Usuário criado: ${s.email} (${s.name})`)
     }
   }
 }

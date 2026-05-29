@@ -14,6 +14,7 @@ const TRAILS = [
       { id: '1.3', title: 'O poder dos juros compostos', emoji: '📈', xp: 50, min: 6 },
       { id: '1.4', title: 'Inflação — o ladrão silencioso', emoji: '💸', xp: 40, min: 5 },
       { id: '1.5', title: 'Seu perfil de investidor', emoji: '🪞', xp: 30, min: 5 },
+      { id: '1.6', title: 'O número mágico dos dividendos', emoji: '🔄', xp: 60, min: 7 },
       { id: '1.boss', title: '⚔️ BOSS: Monte sua primeira carteira', emoji: '🏆', xp: 100, min: 8, isBoss: true },
     ]
   },
