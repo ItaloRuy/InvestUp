@@ -12,7 +12,7 @@ const Database   = require('better-sqlite3')
 const path       = require('path')
 
 // ── Config
-const PORT       = 8080
+const PORT       = process.env.PORT || 8080
 const JWT_SECRET = 'InvestUpSuperSecretKeyForJWTSigning2026AcademicProject'
 const JWT_EXPIRY = '24h'
 const DB_PATH    = path.join(__dirname, 'investup.db')
@@ -103,8 +103,15 @@ seedUsers()
 // ── Express
 const app = express()
 
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000',
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+]
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'],
+  origin: ALLOWED_ORIGINS,
   credentials: true,
 }))
 
