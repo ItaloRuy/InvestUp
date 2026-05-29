@@ -159,7 +159,6 @@ const LESSONS: Record<string, any> = {
       },
     ],
   },
-}
 
   // ─── Trilha 2 — Renda Fixa
 
