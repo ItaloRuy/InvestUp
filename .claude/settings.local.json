@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Command *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\User\\\\OneDrive\\\\Área de Trabalho\\\\Projeto_claude\\\\InvestUp-Web\\\\backend-node\" -ErrorAction SilentlyContinue | Where-Object { -not $_.Name.Equals\\(\"node_modules\"\\) } | Select-Object Name)",
+      "PowerShell(Receive-Job *)",
+      "PowerShell(try { $r = Invoke-WebRequest \"http://localhost:8080/api/health\" -UseBasicParsing; $r.Content } catch { $_.Exception.Message })",
+      "PowerShell(Stop-Job *)",
+      "PowerShell(Start-Sleep 2; try { \\(Invoke-WebRequest \"http://localhost:8080/api/health\" -UseBasicParsing -TimeoutSec 5\\).Content } catch { \"Erro: $_\" })"
+    ]
+  }
+}

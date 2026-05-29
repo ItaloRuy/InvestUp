@@ -1,0 +1,36 @@
+# ── Node / npm
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# ── Frontend build
+frontend/dist/
+frontend/.vite/
+
+# ── Backend Spring Boot
+backend/target/
+backend/*.log
+
+# ── Backend Node
+backend-node/investup.db
+backend-node/backend.log
+backend-node/*.log
+
+# ── Ambiente e segredos
+.env
+.env.local
+.env.*.local
+
+# ── Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDEs
+.vscode/settings.json
+.idea/
+*.iml
+
+# ── Logs gerais
+*.log
+logs/
