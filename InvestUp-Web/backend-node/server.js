@@ -15,7 +15,7 @@ const path       = require('path')
 const PORT       = process.env.PORT || 8080
 const JWT_SECRET = 'InvestUpSuperSecretKeyForJWTSigning2026AcademicProject'
 const JWT_EXPIRY = '24h'
-const DB_PATH    = path.join(__dirname, 'investup.db')
+const DB_PATH    = process.env.DB_PATH || path.join(__dirname, 'investup.db')
 
 // ── Banco SQLite
 const db = new Database(DB_PATH)
