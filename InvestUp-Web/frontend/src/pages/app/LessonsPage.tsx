@@ -22,13 +22,27 @@ const TRAILS = [
     id: 2, name: 'Renda Fixa', emoji: '🏦', color: 'bg-blue-500',
     description: 'Tesouro Direto, CDB, LCI, LCA e tudo sobre investimentos seguros.',
     locked: true,
-    lessons: [],
+    lessons: [
+      { id: '2.1', title: 'O que é Renda Fixa?',          emoji: '🤝', xp: 30,  min: 5 },
+      { id: '2.2', title: 'Tesouro Direto',                emoji: '🇧🇷', xp: 40,  min: 6 },
+      { id: '2.3', title: 'CDB — o banco te pagando',      emoji: '🏦', xp: 35,  min: 5 },
+      { id: '2.4', title: 'LCI e LCA — sem pagar imposto', emoji: '🏠', xp: 35,  min: 5 },
+      { id: '2.5', title: 'Como comparar e escolher',      emoji: '⚖️', xp: 40,  min: 6 },
+      { id: '2.boss', title: '⚔️ BOSS: Monte sua carteira de renda fixa', emoji: '🏆', xp: 100, min: 8, isBoss: true },
+    ],
   },
   {
     id: 3, name: 'Renda Variável', emoji: '📈', color: 'bg-success',
     description: 'Ações, FIIs, ETFs e como investir na bolsa de forma inteligente.',
     locked: true,
-    lessons: [],
+    lessons: [
+      { id: '3.1', title: 'O que são ações?',              emoji: '🏢', xp: 30,  min: 5 },
+      { id: '3.2', title: 'Como funciona a bolsa',          emoji: '🏛️', xp: 35,  min: 5 },
+      { id: '3.3', title: 'FIIs — o tijolo que paga dividendo', emoji: '🏗️', xp: 40, min: 6 },
+      { id: '3.4', title: 'ETFs — a cesta de ações',        emoji: '🧺', xp: 35,  min: 5 },
+      { id: '3.5', title: 'Como analisar uma ação',         emoji: '🔍', xp: 50,  min: 7 },
+      { id: '3.boss', title: '⚔️ BOSS: Carteira diversificada', emoji: '🏆', xp: 120, min: 10, isBoss: true },
+    ],
   },
 ]
 
@@ -79,10 +93,14 @@ export default function LessonsPage() {
       </div>
 
       {TRAILS.map((trail) => {
-        const statuses = computeStatuses(trail.lessons, completedIds, trail.locked ?? false, progressLoaded)
+        const trailLocked =
+          (trail.id === 2 && !completedIds.has('1.boss')) ||
+          (trail.id === 3 && !completedIds.has('2.boss')) ||
+          (trail.id === 1 && (trail.locked ?? false))
+        const statuses = computeStatuses(trail.lessons, completedIds, trailLocked, progressLoaded)
 
         return (
-          <div key={trail.id} className={trail.locked ? 'opacity-60' : ''}>
+          <div key={trail.id} className={trailLocked ? 'opacity-60' : ''}>
             <div className="flex items-center gap-3 mb-4">
               <div className={`w-10 h-10 ${trail.color} rounded-xl flex items-center justify-center text-xl`}>
                 {trail.emoji}
@@ -90,7 +108,7 @@ export default function LessonsPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="font-bold text-gray-900">Trilha {trail.id} — {trail.name}</h2>
-                  {trail.locked && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Em breve</span>}
+                  {trailLocked && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Em breve</span>}
                 </div>
                 <p className="text-xs text-gray-500">{trail.description}</p>
               </div>
