@@ -44,6 +44,19 @@ const TRAILS = [
       { id: '3.boss', title: '⚔️ BOSS: Carteira diversificada', emoji: '🏆', xp: 120, min: 10, isBoss: true },
     ],
   },
+  {
+    id: 4, name: 'Cripto', emoji: '₿', color: 'bg-orange-500',
+    description: 'Bitcoin, Ethereum, blockchain e como investir em cripto com segurança.',
+    locked: true,
+    lessons: [
+      { id: '4.1', title: 'O que é cripto?',                    emoji: '₿',  xp: 30,  min: 5 },
+      { id: '4.2', title: 'Bitcoin e Ethereum',                  emoji: '🔶', xp: 35,  min: 5 },
+      { id: '4.3', title: 'Como funciona o blockchain',          emoji: '⛓️', xp: 40,  min: 6 },
+      { id: '4.4', title: 'Carteiras e exchanges',               emoji: '🔐', xp: 35,  min: 5 },
+      { id: '4.5', title: 'Riscos e como investir com segurança', emoji: '⚠️', xp: 45, min: 6 },
+      { id: '4.boss', title: '⚔️ BOSS: Cripto na sua carteira', emoji: '🏆', xp: 120, min: 8, isBoss: true },
+    ],
+  },
 ]
 
 const statusConfig = {
@@ -96,6 +109,7 @@ export default function LessonsPage() {
         const trailLocked =
           (trail.id === 2 && !completedIds.has('1.boss')) ||
           (trail.id === 3 && !completedIds.has('2.boss')) ||
+          (trail.id === 4 && !completedIds.has('3.boss')) ||
           (trail.id === 1 && (trail.locked ?? false))
         const statuses = computeStatuses(trail.lessons, completedIds, trailLocked, progressLoaded)
 
@@ -147,9 +161,17 @@ export default function LessonsPage() {
                     </>
                   )
 
-                  return isDisabled
-                    ? <div key={lesson.id} className={cardCls}>{inner}</div>
-                    : <Link key={lesson.id} to={`/app/trilhas/${trail.id}/licao/${lesson.id}`} className={cardCls}>{inner}</Link>
+                  if (isDisabled) return <div key={lesson.id} className={cardCls}>{inner}</div>
+                  if (status === 'completed') return (
+                    <div key={lesson.id} className="flex gap-2 items-stretch">
+                      <Link to={`/app/trilhas/${trail.id}/licao/${lesson.id}`} className={`${cardCls} flex-1`}>{inner}</Link>
+                      <Link to={`/app/trilhas/${trail.id}/licao/${lesson.id}?review=true`}
+                        className="flex items-center gap-1 px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-500 hover:bg-gray-50 transition-colors whitespace-nowrap">
+                        🔁 Revisar
+                      </Link>
+                    </div>
+                  )
+                  return <Link key={lesson.id} to={`/app/trilhas/${trail.id}/licao/${lesson.id}`} className={cardCls}>{inner}</Link>
                 })}
               </div>
             ) : (

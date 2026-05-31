@@ -40,8 +40,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await api.post<AuthResponse>('/auth/login', { email, password })
+    const res = await api.post<AuthResponse & { streakReward?: { xp: number; days: number; message: string } }>('/auth/login', { email, password })
     saveSession(res.data)
+    if (res.data.streakReward) {
+      setTimeout(() => {
+        import('react-hot-toast').then(({ default: toast }) => {
+          toast.success(res.data.streakReward!.message, { duration: 5000, icon: '🔥' })
+        })
+      }, 800)
+    }
   }, [])
 
   const register = useCallback(async (name: string, email: string, password: string) => {

@@ -67,7 +67,28 @@ db.exec(`
     amount  REAL    NOT NULL DEFAULT 0,
     UNIQUE(user_id, month)
   );
+
+  CREATE TABLE IF NOT EXISTS budget_goals (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL REFERENCES users(id),
+    category      TEXT    NOT NULL,
+    monthly_limit REAL    NOT NULL DEFAULT 0,
+    month         TEXT    NOT NULL,
+    UNIQUE(user_id, category, month)
+  );
+
+  CREATE TABLE IF NOT EXISTS user_achievements (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL REFERENCES users(id),
+    achievement  TEXT    NOT NULL,
+    unlocked_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, achievement)
+  );
 `)
+
+// ── Adicionar colunas novas sem recriar tabelas
+try { db.exec(`ALTER TABLE users ADD COLUMN avatar_url TEXT`) } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN streak_rewarded_at TEXT`) } catch {}
 
 // ── Seed de usuários padrão
 function seedUsers() {
@@ -223,9 +244,26 @@ app.post('/api/auth/login', (req, res) => {
   // Atualiza último login
   db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(user.id)
 
+  // ── F5: streak reward
+  let streakReward = null
+  const milestones = [7, 30, 100]
+  const milestone = milestones.find(m => user.streak_days === m)
+  if (milestone) {
+    const rewardXp = milestone === 7 ? 50 : milestone === 30 ? 200 : 500
+    const alreadyRewarded = user.streak_rewarded_at &&
+      user.streak_rewarded_at.slice(0, 10) === new Date().toISOString().slice(0, 10)
+    if (!alreadyRewarded) {
+      db.prepare('UPDATE users SET total_xp = total_xp + ?, streak_rewarded_at = datetime("now") WHERE id = ?').run(rewardXp, user.id)
+      streakReward = { xp: rewardXp, days: milestone, message: `🔥 ${milestone} dias seguidos! +${rewardXp} XP bônus!` }
+    }
+  }
+
   console.log(`🔐 Login: ${user.email}`)
-  const token = generateToken(user)
-  return res.json(authResponse(token, user))
+  const freshUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id)
+  const token = generateToken(freshUser)
+  const resp = authResponse(token, freshUser)
+  if (streakReward) resp.streakReward = streakReward
+  return res.json(resp)
 })
 
 // ══════════════════════════════════════════════
@@ -361,6 +399,102 @@ app.put('/api/user/income', requireAuth, (req, res) => {
     ON CONFLICT(user_id, month) DO UPDATE SET amount = excluded.amount
   `).run(req.user.id, month, Number(amount))
   res.json({ month, amount: Number(amount) })
+})
+
+// ══════════════════════════════════════════════
+// F5 — RANKING
+// ══════════════════════════════════════════════
+
+// GET /api/ranking — top 10 por XP
+app.get('/api/ranking', requireAuth, (req, res) => {
+  const rows = db.prepare(`
+    SELECT id, name, total_xp AS totalXp, streak_days AS streakDays,
+           lessons_completed AS lessonsCompleted, investor_profile AS investorProfile,
+           avatar_url AS avatarUrl
+    FROM users WHERE active = 1
+    ORDER BY total_xp DESC LIMIT 10
+  `).all()
+  const myRank = db.prepare(`
+    SELECT COUNT(*)+1 AS rank FROM users WHERE active = 1 AND total_xp > (SELECT total_xp FROM users WHERE id = ?)
+  `).get(req.user.id)
+  res.json({ ranking: rows, myRank: myRank?.rank ?? 1 })
+})
+
+// ══════════════════════════════════════════════
+// F13 — BUDGET GOALS (Metas por categoria)
+// ══════════════════════════════════════════════
+
+// GET /api/user/budget?month=2026-05
+app.get('/api/user/budget', requireAuth, (req, res) => {
+  const month = req.query.month || new Date().toISOString().slice(0, 7)
+  const rows = db.prepare('SELECT category, monthly_limit AS limit FROM budget_goals WHERE user_id = ? AND month = ?').all(req.user.id, month)
+  res.json(rows)
+})
+
+// PUT /api/user/budget — upsert meta de categoria
+app.put('/api/user/budget', requireAuth, (req, res) => {
+  const { category, monthly_limit, month } = req.body
+  if (!category || monthly_limit === undefined || !month) {
+    return res.status(400).json({ error: 'category, monthly_limit e month são obrigatórios' })
+  }
+  db.prepare(`
+    INSERT INTO budget_goals (user_id, category, monthly_limit, month) VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id, category, month) DO UPDATE SET monthly_limit = excluded.monthly_limit
+  `).run(req.user.id, category, Number(monthly_limit), month)
+  res.json({ category, monthly_limit: Number(monthly_limit), month })
+})
+
+// ══════════════════════════════════════════════
+// F15 — AVATAR
+// ══════════════════════════════════════════════
+
+// PATCH /api/user/avatar
+app.patch('/api/user/avatar', requireAuth, (req, res) => {
+  const { avatarUrl } = req.body
+  if (!avatarUrl) return res.status(400).json({ error: 'avatarUrl é obrigatório' })
+  db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(avatarUrl, req.user.id)
+  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)
+  res.json({ ...userSummary(updated), avatarUrl: updated.avatar_url })
+})
+
+// ══════════════════════════════════════════════
+// F16 — ALTERAR SENHA
+// ══════════════════════════════════════════════
+
+// PATCH /api/user/password
+app.patch('/api/user/password', requireAuth, (req, res) => {
+  const { currentPassword, newPassword } = req.body
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'currentPassword e newPassword são obrigatórios' })
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Nova senha deve ter pelo menos 6 caracteres' })
+  }
+  if (!bcrypt.compareSync(currentPassword, req.user.password)) {
+    return res.status(401).json({ error: 'Senha atual incorreta' })
+  }
+  const hashed = bcrypt.hashSync(newPassword, 10)
+  db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, req.user.id)
+  res.json({ success: true, message: 'Senha alterada com sucesso' })
+})
+
+// ══════════════════════════════════════════════
+// F17 — CONQUISTAS COM DATA
+// ══════════════════════════════════════════════
+
+// GET /api/user/achievements
+app.get('/api/user/achievements', requireAuth, (req, res) => {
+  const rows = db.prepare('SELECT achievement, unlocked_at AS unlockedAt FROM user_achievements WHERE user_id = ? ORDER BY unlocked_at ASC').all(req.user.id)
+  res.json(rows)
+})
+
+// POST /api/user/achievements/:achievement — registrar conquista
+app.post('/api/user/achievements/:achievement', requireAuth, (req, res) => {
+  const { achievement } = req.params
+  const existing = db.prepare('SELECT id FROM user_achievements WHERE user_id = ? AND achievement = ?').get(req.user.id, achievement)
+  if (existing) return res.json({ alreadyUnlocked: true })
+  db.prepare(`INSERT INTO user_achievements (user_id, achievement) VALUES (?, ?)`).run(req.user.id, achievement)
+  res.status(201).json({ achievement, unlockedAt: new Date().toISOString() })
 })
 
 // ── Health check

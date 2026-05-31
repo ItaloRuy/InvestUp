@@ -6,7 +6,8 @@
       "PowerShell(Receive-Job *)",
       "PowerShell(try { $r = Invoke-WebRequest \"http://localhost:8080/api/health\" -UseBasicParsing; $r.Content } catch { $_.Exception.Message })",
       "PowerShell(Stop-Job *)",
-      "PowerShell(Start-Sleep 2; try { \\(Invoke-WebRequest \"http://localhost:8080/api/health\" -UseBasicParsing -TimeoutSec 5\\).Content } catch { \"Erro: $_\" })"
+      "PowerShell(Start-Sleep 2; try { \\(Invoke-WebRequest \"http://localhost:8080/api/health\" -UseBasicParsing -TimeoutSec 5\\).Content } catch { \"Erro: $_\" })",
+      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\Git\\\\mingw64\\\\bin;C:\\\\Program Files\\\\Git\\\\cmd\"; Set-Location \"C:\\\\Users\\\\User\\\\OneDrive\\\\Área de Trabalho\\\\Projeto_claude\"; & \"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" repo create InvestUp --private --source=\".\" --remote=origin --push)"
     ]
   }
 }

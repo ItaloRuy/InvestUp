@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Plus, Trash2, ChevronLeft, ChevronRight, Wallet, TrendingDown, Lightbulb, AlertTriangle, CheckCircle, Info, PieChart } from 'lucide-react'
+import { Plus, Trash2, ChevronLeft, ChevronRight, Wallet, TrendingDown, Lightbulb, AlertTriangle, CheckCircle, Info } from 'lucide-react'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../api/client'
 
@@ -24,6 +25,12 @@ const CATS = [
   { id: 'outros',       label: 'Outros',       emoji: '📦', bar: 'bg-gray-400',    text: 'text-gray-600',    bg: 'bg-gray-50',       ideal: 0  },
 ]
 const CAT_MAP = Object.fromEntries(CATS.map(c => [c.id, c]))
+
+const PIE_COLORS: Record<string, string> = {
+  moradia: '#3b82f6', alimentacao: '#f97316', transporte: '#eab308',
+  lazer: '#a855f7', saude: '#f87171', educacao: '#22c55e',
+  investimento: '#1E3A5F', outros: '#9ca3af',
+}
 
 // ── Carteiras modelo predefinidas
 const CARTEIRAS = [
@@ -193,6 +200,7 @@ export default function FinancePage() {
   const [income, setIncome]     = useState(0)
   const [loading, setLoading]   = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [budgets, setBudgets]   = useState<Record<string, number>>({})
 
   const [formCat,    setFormCat]    = useState('alimentacao')
   const [formDesc,   setFormDesc]   = useState('')
@@ -202,15 +210,24 @@ export default function FinancePage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [expRes, incRes] = await Promise.all([
+      const [expRes, incRes, budRes] = await Promise.all([
         api.get<Expense[]>(`/user/expenses?month=${mk}`),
         api.get<{ amount: number }>(`/user/income?month=${mk}`),
+        api.get<{ category: string; limit: number }[]>(`/user/budget?month=${mk}`),
       ])
       setExpenses(expRes.data)
       setIncome(incRes.data.amount)
+      const bmap: Record<string, number> = {}
+      budRes.data.forEach(b => { bmap[b.category] = b.limit })
+      setBudgets(bmap)
     } catch { /* offline: keep current */ }
     finally { setLoading(false) }
   }, [mk])
+
+  const saveBudget = async (category: string, limit: number) => {
+    setBudgets(p => ({ ...p, [category]: limit }))
+    try { await api.put('/user/budget', { category, monthly_limit: limit, month: mk }) } catch {}
+  }
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -335,27 +352,58 @@ export default function FinancePage() {
           {total > 0 && (
             <div className="space-y-2">
               <h2 className="font-bold text-gray-900">Por categoria</h2>
+
+              {/* Gráfico de pizza */}
+              <div className="card">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={CATS.filter(c => byC[c.id] > 0).map(c => ({ name: `${c.emoji} ${c.label}`, value: byC[c.id], color: c.bar }))}
+                      cx="50%" cy="50%" innerRadius={55} outerRadius={85}
+                      paddingAngle={2} dataKey="value"
+                    >
+                      {CATS.filter(c => byC[c.id] > 0).map((cat, i) => (
+                        <Cell key={i} className={cat.bar} fill={PIE_COLORS[cat.id] ?? '#9CA3AF'} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => fmtBRL(v)} />
+                    <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-xs text-gray-600">{v}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
               <div className="card space-y-3">
                 {CATS.filter(c => byC[c.id] > 0).map(cat => {
                   const amt = byC[cat.id]
                   const pct = base > 0 ? (amt/base)*100 : 0
+                  const budget = budgets[cat.id] ?? 0
+                  const overBudget = budget > 0 && amt > budget
                   const over = cat.ideal > 0 && pct > cat.ideal
                   return (
                     <div key={cat.id}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-800">{cat.emoji} {cat.label}</span>
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{cat.emoji} {cat.label}</span>
                         <div className="flex items-center gap-2">
-                          {over && <span className="text-xs text-danger font-semibold">+{(pct-cat.ideal).toFixed(0)}%</span>}
-                          <span className="text-sm font-semibold text-gray-900">{fmtBRL(amt)}</span>
+                          {overBudget && <span className="text-xs text-danger font-semibold">⚠ meta</span>}
+                          {over && !overBudget && <span className="text-xs text-warning font-semibold">+{(pct-cat.ideal).toFixed(0)}%</span>}
+                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{fmtBRL(amt)}</span>
                         </div>
                       </div>
                       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all duration-500 ${over ? 'bg-danger' : cat.bar}`}
-                          style={{ width: `${Math.min(pct*2, 100)}%` }} />
+                        <div className={`h-full rounded-full transition-all duration-500 ${overBudget ? 'bg-danger' : over ? 'bg-warning' : cat.bar}`}
+                          style={{ width: `${budget > 0 ? Math.min((amt/budget)*100, 100) : Math.min(pct*2, 100)}%` }} />
                       </div>
-                      <div className="flex justify-between mt-0.5">
-                        <span className="text-xs text-gray-400">{pct.toFixed(0)}% do total</span>
-                        {cat.ideal > 0 && <span className="text-xs text-gray-400">ideal: {cat.ideal}%</span>}
+                      <div className="flex justify-between items-center mt-0.5">
+                        <span className="text-xs text-gray-400">
+                          {budget > 0 ? `${fmtBRL(amt)} / meta ${fmtBRL(budget)}` : `${pct.toFixed(0)}% do total`}
+                        </span>
+                        <input
+                          type="number" min={0} step={50}
+                          placeholder="meta R$"
+                          value={budget || ''}
+                          onChange={e => saveBudget(cat.id, Number(e.target.value))}
+                          className="w-20 text-xs text-right text-gray-500 bg-transparent border-b border-gray-200 dark:border-gray-700 focus:outline-none focus:border-primary"
+                        />
                       </div>
                     </div>
                   )

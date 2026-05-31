@@ -1,14 +1,28 @@
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, Zap, Flame, BookOpen, Trophy } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { LogOut, Zap, Flame, BookOpen, Trophy, KeyRound, ChevronDown, ChevronUp } from 'lucide-react'
 import { getUserBadge, getAllBadges } from '../../utils/badges'
 import MascotTip from '../../components/ui/MascotTip'
+import api from '../../api/client'
+import toast from 'react-hot-toast'
 
-const ACHIEVEMENTS = [
-  { id: 1, emoji: '🌱', title: 'Primeiro Passo', desc: 'Completou a primeira lição', done: true },
-  { id: 2, emoji: '🔥', title: 'Começando o Hábito', desc: '3 dias seguidos', done: true },
-  { id: 3, emoji: '📊', title: 'Pequeno Gestor', desc: 'Rodou a primeira simulação', done: false },
-  { id: 4, emoji: '🥚', title: 'Diversificador', desc: 'Carteira com 4+ ativos', done: false },
+const ACHIEVEMENT_DEFS = [
+  { id: 'primeiro_passo',     emoji: '🌱', title: 'Primeiro Passo',      desc: 'Completou a primeira lição' },
+  { id: 'comecando_habito',   emoji: '🔥', title: 'Começando o Hábito',  desc: '3 dias seguidos' },
+  { id: 'pequeno_gestor',     emoji: '📊', title: 'Pequeno Gestor',       desc: 'Rodou a primeira simulação' },
+  { id: 'diversificador',     emoji: '🥚', title: 'Diversificador',       desc: 'Carteira com 4+ ativos' },
+  { id: 'trilha1_completa',   emoji: '🎓', title: 'Mestre dos Fundamentos', desc: 'Completou a Trilha 1' },
+  { id: 'trilha2_completa',   emoji: '💳', title: 'Especialista em RF',   desc: 'Completou a Trilha 2' },
+  { id: 'trilha3_completa',   emoji: '📈', title: 'Analista de Mercado',  desc: 'Completou a Trilha 3' },
+  { id: 'streak_7',           emoji: '🔥', title: 'Semana Perfeita',      desc: '7 dias de streak' },
+  { id: 'streak_30',          emoji: '📅', title: 'Mês de Ouro',          desc: '30 dias de streak' },
+  { id: 'xp_1000',            emoji: '⚡', title: 'Mil XP',              desc: 'Atingiu 1.000 XP' },
+]
+
+const AVATARS = [
+  '🐢', '🦁', '🐻', '🐺', '🦊', '🐸',
+  '🤖', '👨‍💻', '🧑‍🚀', '👩‍💼', '🧙', '🥷',
 ]
 
 function getLevel(xp: number) {
@@ -31,13 +45,10 @@ const profileLabels: Record<string, { label: string; emoji: string; color: strin
 const allBadges = getAllBadges()
 
 export default function ProfilePage() {
-  const { user, logout } = useAuth()
+  const { user, updateUser, logout } = useAuth()
   const navigate = useNavigate()
   const level = getLevel(user?.totalXp ?? 0)
   const profile = profileLabels[user?.investorProfile ?? 'NAO_DEFINIDO']
-  const levelProgress = user?.totalXp && level.nextXp
-    ? Math.min(100, (user.totalXp / level.nextXp) * 100)
-    : 100
 
   const badge = getUserBadge({
     xp: user?.totalXp ?? 0,
@@ -46,26 +57,86 @@ export default function ProfilePage() {
     investorProfile: user?.investorProfile ?? 'NAO_DEFINIDO',
   })
 
+  // Avatar
+  const [showAvatarModal, setShowAvatarModal] = useState(false)
+  const handleAvatar = async (avatar: string) => {
+    try {
+      await api.patch('/user/avatar', { avatarUrl: avatar })
+      updateUser({ avatarUrl: avatar } as any)
+      setShowAvatarModal(false)
+      toast.success('Avatar atualizado!')
+    } catch { toast.error('Erro ao atualizar avatar') }
+  }
+
+  // Alterar senha
+  const [showPwdForm,  setShowPwdForm]  = useState(false)
+  const [currentPwd,   setCurrentPwd]   = useState('')
+  const [newPwd,       setNewPwd]       = useState('')
+  const [confirmPwd,   setConfirmPwd]   = useState('')
+  const [pwdLoading,   setPwdLoading]   = useState(false)
+  const handlePassword = async () => {
+    if (newPwd !== confirmPwd) return toast.error('As senhas não coincidem')
+    if (newPwd.length < 6) return toast.error('Mínimo 6 caracteres')
+    setPwdLoading(true)
+    try {
+      await api.patch('/user/password', { currentPassword: currentPwd, newPassword: newPwd })
+      toast.success('Senha alterada com sucesso!')
+      setShowPwdForm(false); setCurrentPwd(''); setNewPwd(''); setConfirmPwd('')
+    } catch (e: any) {
+      toast.error(e.response?.data?.error ?? 'Erro ao alterar senha')
+    } finally { setPwdLoading(false) }
+  }
+
+  // Conquistas
+  const [unlockedAchievements, setUnlockedAchievements] = useState<{ achievement: string; unlockedAt: string }[]>([])
+  useEffect(() => {
+    api.get<{ achievement: string; unlockedAt: string }[]>('/user/achievements')
+      .then(({ data }) => setUnlockedAchievements(data))
+      .catch(() => {})
+  }, [])
+
   return (
     <div className="space-y-6 pb-20 md:pb-0">
-      <h1 className="text-2xl font-bold text-gray-900">Meu Perfil</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Meu Perfil</h1>
 
       {/* ── Mascote com dica cômica */}
       <MascotTip tip={badge.tip} />
 
       {/* ── Avatar e info */}
       <div className="card flex items-center gap-5">
-        <div className="w-16 h-16 bg-primary-muted rounded-2xl flex items-center justify-center text-3xl">
-          {level.emoji}
-        </div>
+        <button onClick={() => setShowAvatarModal(true)}
+          className="w-16 h-16 bg-primary-muted rounded-2xl flex items-center justify-center text-3xl hover:scale-105 transition-transform relative group">
+          {(user as any)?.avatarUrl ?? level.emoji}
+          <span className="absolute inset-0 bg-black/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">Editar</span>
+        </button>
         <div className="flex-1 min-w-0">
-          <p className="text-lg font-bold text-gray-900 truncate">{user?.name}</p>
+          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 truncate">{user?.name}</p>
           <p className="text-sm text-gray-500 truncate">{user?.email}</p>
           <span className={`inline-block mt-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${profile.color}`}>
             {profile.emoji} {profile.label}
           </span>
         </div>
       </div>
+
+      {/* ── Modal de avatar */}
+      {showAvatarModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowAvatarModal(false)}>
+          <div className="card max-w-sm w-full space-y-4" onClick={e => e.stopPropagation()}>
+            <p className="font-bold text-gray-900 dark:text-gray-100">Escolha seu avatar</p>
+            <div className="grid grid-cols-6 gap-2">
+              {AVATARS.map(av => (
+                <button key={av} onClick={() => handleAvatar(av)}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-2xl transition-all hover:scale-110 ${
+                    (user as any)?.avatarUrl === av ? 'bg-primary-muted ring-2 ring-primary' : 'bg-gray-50 dark:bg-gray-800'
+                  }`}>
+                  {av}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setShowAvatarModal(false)} className="w-full py-2 text-sm text-gray-400 hover:text-gray-600">Cancelar</button>
+          </div>
+        </div>
+      )}
 
       {/* ── Selo atual */}
       <div className={`card border flex items-center gap-4 ${badge.bg}`}>
@@ -78,7 +149,7 @@ export default function ProfilePage() {
       </div>
 
       {/* ── Nível e XP */}
-      <div className="card space-y-3">
+      <div className="card space-y-4">
         <div className="flex justify-between items-center">
           <div>
             <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Nível atual</p>
@@ -89,16 +160,44 @@ export default function ProfilePage() {
             <p className="text-2xl font-bold text-gray-900">{user?.totalXp ?? 0}</p>
           </div>
         </div>
+
+        {/* Barra com marcos de nível */}
+        <div>
+          <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-primary to-blue-400 rounded-full transition-all duration-700"
+              style={{ width: `${Math.min(((user?.totalXp ?? 0) / 10000) * 100, 100)}%` }} />
+          </div>
+          {/* Marcos */}
+          <div className="flex justify-between mt-1.5">
+            {[
+              { xp: 0,     emoji: '🌱', label: 'Poupador' },
+              { xp: 200,   emoji: '🔍', label: 'Curioso' },
+              { xp: 500,   emoji: '📚', label: 'Aprendiz' },
+              { xp: 1000,  emoji: '💼', label: 'Investidor' },
+              { xp: 2500,  emoji: '📈', label: 'Trader' },
+              { xp: 5000,  emoji: '🏆', label: 'Mestre' },
+              { xp: 10000, emoji: '👑', label: 'Lenda' },
+            ].map(({ xp, emoji, label }) => {
+              const reached = (user?.totalXp ?? 0) >= xp
+              return (
+                <div key={xp} className="flex flex-col items-center gap-0.5" style={{ width: '14%' }}>
+                  <span className={`text-base ${reached ? '' : 'grayscale opacity-40'}`}>{emoji}</span>
+                  <span className={`text-[9px] text-center leading-tight ${reached ? 'text-primary font-semibold' : 'text-gray-400'}`}>
+                    {label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
         {level.next && (
-          <>
-            <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-primary rounded-full transition-all duration-700"
-                style={{ width: `${levelProgress}%` }} />
-            </div>
-            <p className="text-xs text-gray-400">
-              {user?.totalXp} / {level.nextXp} XP para {level.next}
-            </p>
-          </>
+          <p className="text-xs text-gray-400 text-center">
+            {user?.totalXp} / {level.nextXp} XP para {level.next} {level.emoji}
+          </p>
+        )}
+        {!level.next && (
+          <p className="text-xs text-success font-semibold text-center">👑 Nível máximo atingido!</p>
         )}
       </div>
 
@@ -147,28 +246,58 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* ── Conquistas */}
+      {/* ── Conquistas com data */}
       <div>
-        <h2 className="text-lg font-bold text-gray-900 mb-3">Conquistas</h2>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-3">Conquistas</h2>
         <div className="grid grid-cols-2 gap-3">
-          {ACHIEVEMENTS.map((a) => (
-            <div key={a.id}
-              className={`card flex items-center gap-3 ${a.done ? '' : 'opacity-40 grayscale'}`}>
-              <span className="text-2xl">{a.emoji}</span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{a.title}</p>
-                <p className="text-xs text-gray-500 truncate">{a.desc}</p>
+          {ACHIEVEMENT_DEFS.map(a => {
+            const unlocked = unlockedAchievements.find(u => u.achievement === a.id)
+            return (
+              <div key={a.id} className={`card flex items-start gap-3 transition-all ${unlocked ? '' : 'opacity-40 grayscale'}`}>
+                <span className="text-2xl flex-shrink-0">{a.emoji}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{a.title}</p>
+                  <p className="text-xs text-gray-500 truncate">{a.desc}</p>
+                  {unlocked && (
+                    <p className="text-[10px] text-success font-semibold mt-0.5">
+                      ✅ {new Date(unlocked.unlockedAt).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
+      </div>
+
+      {/* ── Alterar senha */}
+      <div className="card space-y-3">
+        <button onClick={() => setShowPwdForm(v => !v)}
+          className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-2">
+            <KeyRound size={18} className="text-gray-500" />
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">Alterar senha</span>
+          </div>
+          {showPwdForm ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+        </button>
+        {showPwdForm && (
+          <div className="space-y-3 pt-1 border-t border-gray-100 dark:border-gray-700">
+            <input type="password" placeholder="Senha atual" value={currentPwd} onChange={e => setCurrentPwd(e.target.value)} className="input" />
+            <input type="password" placeholder="Nova senha (mín. 6 caracteres)" value={newPwd} onChange={e => setNewPwd(e.target.value)} className="input" />
+            <input type="password" placeholder="Confirmar nova senha" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} className="input" />
+            <button onClick={handlePassword} disabled={pwdLoading || !currentPwd || !newPwd || !confirmPwd}
+              className="btn-primary w-full disabled:opacity-40">
+              {pwdLoading ? 'Salvando...' : 'Salvar nova senha'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Logout */}
       <button
         onClick={() => { logout(); navigate('/login') }}
         className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl
-          border-2 border-danger/30 text-danger font-medium hover:bg-danger-muted transition-colors"
+          border-2 border-danger/30 text-danger font-medium hover:bg-danger-muted dark:hover:bg-red-900/20 transition-colors"
       >
         <LogOut size={18} />
         Sair da conta

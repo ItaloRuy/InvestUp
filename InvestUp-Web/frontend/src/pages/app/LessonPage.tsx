@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { X, ChevronRight } from 'lucide-react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { X, ChevronRight, RotateCcw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../api/client'
@@ -8,6 +8,345 @@ import type { User } from '../../types'
 
 // ─── Banco de lições
 const LESSONS: Record<string, any> = {
+  '1.1': {
+    id: '1.1', title: 'Dinheiro trabalhando por você', emoji: '💡', xpReward: 30,
+    steps: [
+      {
+        type: 'content', emoji: '💡',
+        text: [
+          'Imagina dois amigos: Lucas e Pedro. Os dois ganham R$ 3.000 por mês.',
+          'Lucas gasta tudo todo mês. Pedro poupa R$ 300 e **investe**.',
+          'Depois de 20 anos, Lucas ainda ganha R$ 3.000. Pedro tem uma renda extra vinda dos investimentos — o dinheiro dele **trabalha enquanto ele dorme**.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '💡 Investir = colocar dinheiro para trabalhar por você. Com o tempo, o retorno cresce sobre o retorno anterior — isso se chama juros compostos.',
+      },
+      {
+        type: 'content', emoji: '🏦',
+        text: [
+          'Existem dois jeitos de ganhar dinheiro:',
+          '**Ativo:** você troca seu tempo por dinheiro — trabalha, recebe salário.',
+          '**Passivo:** seu dinheiro trabalha por você — rende juros, dividendos, aluguéis.',
+          'Investir é construir renda passiva aos poucos, até ela complementar (ou substituir) seu salário.',
+        ],
+      },
+      {
+        type: 'content', emoji: '📅',
+        text: [
+          'O segredo não é ganhar muito — é **começar cedo e ser consistente**.',
+          'R$ 200 por mês investidos a 10% a.a. durante 30 anos viram mais de **R$ 450.000**.',
+          'Os mesmos R$ 200 durante só 10 anos viram apenas **R$ 40.000**. O tempo faz a diferença gigantesca.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '⏰ O melhor momento para começar a investir era ontem. O segundo melhor momento é hoje.',
+      },
+      {
+        type: 'quiz',
+        question: 'O que significa "dinheiro trabalhando por você"?',
+        options: [
+          { id: 'a', text: 'Trabalhar horas extras para ganhar mais', correct: false },
+          { id: 'b', text: 'Investir para gerar renda passiva sem precisar trocar tempo por dinheiro', correct: true },
+          { id: 'c', text: 'Pedir dinheiro emprestado e pagar depois', correct: false },
+          { id: 'd', text: 'Economizar guardando em casa', correct: false },
+        ],
+        explanation: 'Renda passiva é o que acontece quando você investe: o dinheiro gera retorno sem você trabalhar diretamente. Juros, dividendos e aluguéis são exemplos — você recebe enquanto dorme.',
+      },
+      {
+        type: 'quiz',
+        question: 'Por que começar a investir cedo faz tanta diferença?',
+        options: [
+          { id: 'a', text: 'Porque os juros são maiores para quem começa jovem', correct: false },
+          { id: 'b', text: 'Porque quanto mais tempo, mais os juros compostos multiplicam o valor', correct: true },
+          { id: 'c', text: 'Porque o governo dá benefício para quem investe cedo', correct: false },
+          { id: 'd', text: 'Não faz diferença — o valor final é o mesmo', correct: false },
+        ],
+        explanation: 'Juros compostos são juros sobre juros. Quanto mais tempo o dinheiro fica investido, mais ciclos de crescimento ele passa. 30 anos geram mais de 10x o resultado de 10 anos com o mesmo aporte mensal.',
+      },
+    ],
+  },
+
+  '1.2': {
+    id: '1.2', title: 'Risco x Retorno', emoji: '⚖️', xpReward: 30,
+    steps: [
+      {
+        type: 'content', emoji: '⚖️',
+        text: [
+          'Existe uma regra de ouro no mercado financeiro: **maior retorno = maior risco**.',
+          'Não existe investimento que pague muito e seja completamente seguro ao mesmo tempo.',
+          'Quem promete 5% ao mês sem risco está mentindo — ou vai desaparecer com seu dinheiro.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '🚨 Se parece bom demais para ser verdade, provavelmente é golpe. Desconfie de qualquer promessa de retorno extraordinário com "risco zero".',
+      },
+      {
+        type: 'content', emoji: '📊',
+        text: [
+          'Pense em uma escada de risco x retorno:',
+          '**Poupança / Tesouro Selic:** risco baixíssimo → retorno ~10% a.a.',
+          '**CDB / LCI / LCA:** risco baixo → retorno ~10–13% a.a.',
+          '**Ações / FIIs:** risco médio/alto → retorno potencial maior, mas pode cair.',
+          '**Cripto / Day trade:** risco alto → pode dobrar ou perder tudo.',
+        ],
+      },
+      {
+        type: 'content', emoji: '🛡️',
+        text: [
+          'A chave é a **diversificação** — não colocar todos os ovos na mesma cesta.',
+          'Combinando ativos de diferentes riscos, você reduz o impacto se um deles cair.',
+          'Um carteira diversificada equilibra segurança e crescimento ao mesmo tempo.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '🥚 Diversificação = distribuir o dinheiro entre vários ativos diferentes. Se um cair, os outros seguram.',
+      },
+      {
+        type: 'quiz',
+        question: 'Um investimento promete 8% ao mês com total segurança. O que você deve fazer?',
+        options: [
+          { id: 'a', text: 'Investir tudo imediatamente — oportunidade rara', correct: false },
+          { id: 'b', text: 'Desconfiar — maior retorno sempre vem com maior risco', correct: true },
+          { id: 'c', text: 'Investir metade para não perder a oportunidade', correct: false },
+          { id: 'd', text: 'Esperar mais um mês para ter certeza', correct: false },
+        ],
+        explanation: '8% ao mês seria 150%+ ao ano — muito acima de qualquer investimento legítimo. A relação risco x retorno é universal: não existe retorno extraordinário sem risco correspondente.',
+      },
+      {
+        type: 'quiz',
+        question: 'Por que diversificar a carteira reduz o risco?',
+        options: [
+          { id: 'a', text: 'Porque você ganha mais quando tudo sobe', correct: false },
+          { id: 'b', text: 'Porque a queda de um ativo é compensada pelos outros que estão estáveis ou subindo', correct: true },
+          { id: 'c', text: 'Porque o governo garante carteiras diversificadas', correct: false },
+          { id: 'd', text: 'Não reduz — diversificar só complica', correct: false },
+        ],
+        explanation: 'Ativos diferentes reagem de formas diferentes ao mercado. Quando ações caem, renda fixa pode estar subindo. Quando o Brasil vai mal, ativos internacionais podem compensar. Diversificar distribui o risco.',
+      },
+    ],
+  },
+
+  '1.3': {
+    id: '1.3', title: 'O poder dos juros compostos', emoji: '📈', xpReward: 50,
+    steps: [
+      {
+        type: 'content', emoji: '📈',
+        text: [
+          'Einstein teria chamado os juros compostos de "a oitava maravilha do mundo".',
+          'A lógica é simples: você ganha juros. Esses juros entram no seu saldo. No mês seguinte, você ganha juros **sobre o valor maior**.',
+          'É juros sobre juros — e o crescimento acelera com o tempo.',
+        ],
+      },
+      {
+        type: 'content', emoji: '🧮',
+        text: [
+          'Exemplo: R$ 1.000 a 10% ao ano.',
+          '**Juros simples:** todo ano você ganha R$ 100. Em 10 anos: R$ 2.000.',
+          '**Juros compostos:** ano 1 = R$ 1.100, ano 2 = R$ 1.210, ano 3 = R$ 1.331... Em 10 anos: **R$ 2.594**.',
+          'A diferença? R$ 594 a mais — sem fazer nada, só pelo efeito dos juros sobre juros.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '📐 Fórmula: Valor Final = Principal × (1 + taxa)^tempo. Ex: R$ 1.000 × (1,10)^10 = R$ 2.594',
+      },
+      {
+        type: 'content', emoji: '🚀',
+        text: [
+          'Agora com aportes mensais a história fica ainda melhor:',
+          '**R$ 500/mês a 10% a.a. por 20 anos = R$ 382.000**',
+          'Você colocou R$ 120.000 do seu bolso. Os juros geraram outros **R$ 262.000** — mais que o dobro do que você investiu.',
+          'Quanto maior o prazo, mais a bola de neve cresce.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '⏰ Regra dos 72: divida 72 pela taxa anual para saber em quantos anos seu dinheiro dobra. Taxa 10% → dobra em ~7,2 anos.',
+      },
+      {
+        type: 'quiz',
+        question: 'Qual é a diferença entre juros simples e compostos?',
+        options: [
+          { id: 'a', text: 'Simples é mais rápido; compostos são mais lentos', correct: false },
+          { id: 'b', text: 'Compostos incidem sobre o saldo total (capital + juros anteriores); simples só sobre o capital inicial', correct: true },
+          { id: 'c', text: 'São iguais no longo prazo', correct: false },
+          { id: 'd', text: 'Simples é exclusivo de renda variável', correct: false },
+        ],
+        explanation: 'Juros simples: sempre calculados sobre o valor inicial. Juros compostos: calculados sobre o saldo atual (que já inclui os juros anteriores). Por isso os compostos crescem exponencialmente e os simples, linearmente.',
+      },
+      {
+        type: 'quiz',
+        question: 'Pela Regra dos 72, quanto tempo leva para R$ 10.000 dobrarem a 8% ao ano?',
+        options: [
+          { id: 'a', text: '8 anos', correct: false },
+          { id: 'b', text: '12 anos', correct: false },
+          { id: 'c', text: '9 anos', correct: true },
+          { id: 'd', text: '72 anos', correct: false },
+        ],
+        explanation: '72 ÷ 8 = 9 anos. A Regra dos 72 é uma aproximação prática: divida 72 pela taxa anual para estimar o tempo de dobramento. A 8% ao ano, R$ 10.000 viram R$ 20.000 em ~9 anos.',
+      },
+      {
+        type: 'quiz',
+        question: 'Ana investe R$ 300/mês por 30 anos a 10% a.a. Ela colocou R$ 108.000 do bolso. Qual será o valor final aproximado?',
+        options: [
+          { id: 'a', text: 'R$ 120.000 — crescimento pequeno', correct: false },
+          { id: 'b', text: 'R$ 216.000 — dobrou o investido', correct: false },
+          { id: 'c', text: 'R$ 680.000 — juros compostos por 30 anos', correct: true },
+          { id: 'd', text: 'R$ 108.000 — não rendeu nada', correct: false },
+        ],
+        explanation: 'Com juros compostos por 30 anos, o resultado é muito maior que o dobro. Ana colocou R$ 108.000 e os juros geraram aproximadamente R$ 572.000 — mais de 5x o que ela investiu. O tempo é o maior aliado do investidor.',
+      },
+    ],
+  },
+
+  '1.5': {
+    id: '1.5', title: 'Seu perfil de investidor', emoji: '🪞', xpReward: 30,
+    steps: [
+      {
+        type: 'content', emoji: '🪞',
+        text: [
+          'Antes de escolher onde investir, você precisa se conhecer como investidor.',
+          'Não existe carteira certa para todo mundo — existe a carteira certa **para você**, considerando seu perfil, objetivos e tolerância a risco.',
+          'Os três perfis clássicos são: **Conservador**, **Moderado** e **Arrojado**.',
+        ],
+      },
+      {
+        type: 'content', emoji: '🛡️',
+        text: [
+          '**Conservador 🛡️** — prioriza segurança acima de tudo.',
+          'Prefere saber exatamente quanto vai receber. Aceita rentabilidade menor em troca de tranquilidade.',
+          'Carteira típica: 80% renda fixa (Selic, CDB, LCI) + 20% renda variável de baixo risco.',
+        ],
+      },
+      {
+        type: 'content', emoji: '⚖️',
+        text: [
+          '**Moderado ⚖️** — equilibra segurança e crescimento.',
+          'Aceita alguma volatilidade desde que o retorno compense no longo prazo.',
+          'Carteira típica: 50% renda fixa + 30% ações/FIIs + 20% ETFs.',
+        ],
+      },
+      {
+        type: 'content', emoji: '🚀',
+        text: [
+          '**Arrojado 🚀** — foca em máximo crescimento no longo prazo.',
+          'Aceita oscilações fortes, sabe que pode perder no curto prazo mas acredita no longo.',
+          'Carteira típica: 20% renda fixa (só reserva de emergência) + 80% renda variável (ações, FIIs, ETFs, cripto).',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '💡 Seu perfil pode mudar com o tempo. Quem começa conservador tende a ficar mais arrojado conforme aprende e ganha confiança. Reavalie anualmente.',
+      },
+      {
+        type: 'quiz',
+        question: 'O mercado caiu 20% em um mês. Você tem ações. O que o perfil conservador faria?',
+        options: [
+          { id: 'a', text: 'Nada — conservadores não têm ações', correct: false },
+          { id: 'b', text: 'Vender tudo para evitar mais perdas', correct: false },
+          { id: 'c', text: 'Provavelmente já alocou pouco em ações — o impacto na carteira é limitado', correct: true },
+          { id: 'd', text: 'Comprar mais aproveitando a queda', correct: false },
+        ],
+        explanation: 'O conservador protege o patrimônio alocando pouco em renda variável. Uma queda de 20% nas ações impacta muito menos quem tem só 10–20% da carteira em renda variável do que quem tem 80%.',
+      },
+      {
+        type: 'quiz',
+        question: 'Carlos tem 25 anos, emprego estável, sem dívidas e investe pensando em 30 anos. Qual perfil faz mais sentido?',
+        options: [
+          { id: 'a', text: 'Conservador — mais seguro', correct: false },
+          { id: 'b', text: 'Moderado — equilíbrio sempre é bom', correct: false },
+          { id: 'c', text: 'Arrojado — longo prazo e estabilidade permitem aceitar mais risco', correct: true },
+          { id: 'd', text: 'Não precisa investir ainda', correct: false },
+        ],
+        explanation: 'Com 30 anos de horizonte e sem dependentes ou dívidas, Carlos pode atravessar crises sem precisar sacar. O tempo é o principal fator que permite ser arrojado — quedas de curto prazo não importam quando o objetivo está décadas à frente.',
+      },
+    ],
+  },
+
+  '1.boss': {
+    id: '1.boss', title: 'BOSS: Monte sua primeira carteira', emoji: '🏆', xpReward: 100,
+    steps: [
+      {
+        type: 'content', emoji: '⚔️',
+        text: [
+          'Chegou a hora do boss final da Trilha 1. Você aprendeu os fundamentos — agora vai montar uma carteira real.',
+          'Uma boa primeira carteira tem três pilares: **reserva de emergência**, **proteção da inflação** e **crescimento de longo prazo**.',
+          'Vamos passar por cada um.',
+        ],
+      },
+      {
+        type: 'content', emoji: '🏦',
+        text: [
+          '**Pilar 1 — Reserva de emergência (3 a 6 meses de gastos)**',
+          'Antes de qualquer investimento, você precisa de uma reserva para imprevistos.',
+          'Onde guardar: **Tesouro Selic** ou **CDB com liquidez diária**. Nada mais.',
+          'Essa reserva não é investimento — é proteção. Ela não pode estar em ações ou qualquer coisa que oscile.',
+        ],
+      },
+      {
+        type: 'content', emoji: '🛡️',
+        text: [
+          '**Pilar 2 — Proteção da inflação (médio/longo prazo)**',
+          'Dinheiro parado perde valor com a inflação. Depois da reserva, proteja o restante.',
+          'Opções: **Tesouro IPCA+** para longo prazo, **LCI/LCA** para 1–3 anos.',
+          'Objetivo: fazer seu dinheiro crescer pelo menos acima da inflação.',
+        ],
+      },
+      {
+        type: 'content', emoji: '📈',
+        text: [
+          '**Pilar 3 — Crescimento (longo prazo)**',
+          'Com reserva e proteção feitas, é hora de buscar retorno maior.',
+          '**ETFs** (BOVA11, IVVB11) para diversificação automática.',
+          '**FIIs** para renda passiva mensal isenta de IR.',
+          'Comece pequeno — 10 a 20% da carteira — e aumente conforme aprende.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '🏆 Carteira sugerida para iniciante: 30% Tesouro Selic (reserva) + 30% Tesouro IPCA+ + 25% BOVA11/IVVB11 + 15% FIIs. Simples, diversificada e eficiente.',
+      },
+      {
+        type: 'quiz',
+        question: 'Qual deve ser o PRIMEIRO passo antes de qualquer investimento?',
+        options: [
+          { id: 'a', text: 'Comprar ações da empresa que você mais usa', correct: false },
+          { id: 'b', text: 'Montar a reserva de emergência em liquidez diária', correct: true },
+          { id: 'c', text: 'Investir em cripto para ganhar rápido e depois montar a base', correct: false },
+          { id: 'd', text: 'Abrir conta em vários bancos', correct: false },
+        ],
+        explanation: 'A reserva de emergência é a base de tudo. Sem ela, qualquer imprevisto (perda de emprego, doença, conserto do carro) vai forçar você a vender investimentos na hora errada — possivelmente no prejuízo.',
+      },
+      {
+        type: 'quiz',
+        question: 'Fernanda tem R$ 5.000 de reserva, R$ 2.000 sobrando e perfil moderado. Como distribuir os R$ 2.000?',
+        options: [
+          { id: 'a', text: 'Tudo em cripto — maior potencial', correct: false },
+          { id: 'b', text: 'Tudo na poupança — mais seguro', correct: false },
+          { id: 'c', text: 'R$ 1.000 Tesouro IPCA+ + R$ 600 BOVA11 + R$ 400 FII', correct: true },
+          { id: 'd', text: 'Guardar em casa — não confia no mercado', correct: false },
+        ],
+        explanation: 'Com reserva já feita e perfil moderado, Fernanda pode dividir: parte em renda fixa de longo prazo (proteção da inflação) e parte em renda variável diversificada (ETF + FII). Simples e equilibrado.',
+      },
+      {
+        type: 'quiz',
+        question: 'Por que FIIs são bons para uma primeira carteira de renda variável?',
+        options: [
+          { id: 'a', text: 'Porque têm risco zero', correct: false },
+          { id: 'b', text: 'Porque pagam dividendos mensais isentos de IR e custam poucos reais por cota', correct: true },
+          { id: 'c', text: 'Porque são garantidos pelo governo', correct: false },
+          { id: 'd', text: 'Porque o preço nunca cai', correct: false },
+        ],
+        explanation: 'FIIs têm dividendos mensais isentos de IR (ótimo para renda passiva), cotas acessíveis (geralmente abaixo de R$ 150) e diversificação automática dentro do fundo. São um ótimo primeiro passo em renda variável.',
+      },
+    ],
+  },
+
   '1.4': {
     id: '1.4',
     title: 'Inflação — o ladrão silencioso',
@@ -884,12 +1223,368 @@ const LESSONS: Record<string, any> = {
       },
     ],
   },
+
+  // ─── Trilha 4 — Cripto
+
+  '4.1': {
+    id: '4.1', title: 'O que é cripto?', emoji: '₿', xpReward: 30,
+    steps: [
+      {
+        type: 'content', emoji: '₿',
+        text: [
+          'Criptomoeda é um **dinheiro digital** que não depende de banco central ou governo.',
+          'Existe só na internet, funciona em uma rede descentralizada e as transações são registradas publicamente.',
+          'A primeira e mais famosa é o **Bitcoin**, criada em 2009 por uma pessoa (ou grupo) com o pseudônimo Satoshi Nakamoto.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '💡 Cripto = moeda digital descentralizada. Nenhum banco ou governo controla — a rede de computadores ao redor do mundo é quem valida as transações.',
+      },
+      {
+        type: 'content', emoji: '🌍',
+        text: [
+          'Por que as pessoas se interessam por cripto?',
+          '**Descentralização:** nenhum governo pode confiscar ou bloquear.',
+          '**Escassez programada:** o Bitcoin tem um limite de 21 milhões de unidades — nunca existirão mais que isso.',
+          '**Transferências globais:** você manda valor para qualquer lugar do mundo em minutos, sem intermediários.',
+        ],
+      },
+      {
+        type: 'content', emoji: '📊',
+        text: [
+          'Mas cripto também tem riscos sérios:',
+          '**Volatilidade extrema:** Bitcoin já caiu 80% em um ano e subiu 1000% em outro.',
+          '**Sem garantia:** não tem FGC como os bancos. Se perder o acesso, perdeu tudo.',
+          '**Regulação incerta:** governos podem mudar regras a qualquer momento.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '⚠️ Cripto é renda variável de alto risco. Nunca invista mais do que você está disposto a perder completamente. Para iniciantes: máximo 5-10% da carteira.',
+      },
+      {
+        type: 'quiz',
+        question: 'O que torna o Bitcoin diferente do Real ou do Dólar?',
+        options: [
+          { id: 'a', text: 'Bitcoin rende mais que qualquer investimento', correct: false },
+          { id: 'b', text: 'Bitcoin é descentralizado — nenhum governo ou banco o controla', correct: true },
+          { id: 'c', text: 'Bitcoin tem garantia do governo brasileiro', correct: false },
+          { id: 'd', text: 'Bitcoin não pode ser comprado por brasileiros', correct: false },
+        ],
+        explanation: 'A descentralização é a principal inovação do Bitcoin. O Real é emitido e controlado pelo Banco Central. O Bitcoin é emitido por um protocolo matemático e validado por uma rede global — sem autoridade central.',
+      },
+      {
+        type: 'quiz',
+        question: 'Qual percentual máximo da carteira faz sentido para cripto em um perfil iniciante?',
+        options: [
+          { id: 'a', text: '50% — alto potencial de retorno', correct: false },
+          { id: 'b', text: '100% — cripto é o futuro', correct: false },
+          { id: 'c', text: '5-10% — alto risco exige exposição limitada', correct: true },
+          { id: 'd', text: '0% — nunca deve entrar na carteira', correct: false },
+        ],
+        explanation: 'Cripto tem volatilidade extrema. Uma alocação pequena (5-10%) permite participar do potencial de valorização sem colocar em risco o patrimônio principal. Nunca invista o que você não pode perder.',
+      },
+    ],
+  },
+
+  '4.2': {
+    id: '4.2', title: 'Bitcoin e Ethereum', emoji: '🔶', xpReward: 35,
+    steps: [
+      {
+        type: 'content', emoji: '₿',
+        text: [
+          '**Bitcoin (BTC)** é o ouro digital. Foi criado como uma reserva de valor — como o ouro, é escasso (máximo 21 milhões) e resistente à censura.',
+          'É a cripto mais antiga, mais conhecida e mais adotada institucionalmente.',
+          'Seu principal caso de uso: **guardar valor** fora do sistema financeiro tradicional.',
+        ],
+      },
+      {
+        type: 'content', emoji: '🔶',
+        text: [
+          '**Ethereum (ETH)** é diferente: é uma plataforma de programação.',
+          'Permite criar **contratos inteligentes** — programas que executam automaticamente quando condições são cumpridas.',
+          'Em cima do Ethereum foram construídos: DeFi (finanças descentralizadas), NFTs, tokens de projetos.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '🔑 Bitcoin = reserva de valor (ouro digital). Ethereum = plataforma de aplicações (internet do valor). São as duas maiores e mais consolidadas criptomoedas.',
+      },
+      {
+        type: 'content', emoji: '📊',
+        text: [
+          'Juntos, BTC e ETH representam mais de 60% do mercado total de criptomoedas.',
+          'O restante são **altcoins** — moedas alternativas. Algumas têm utilidade real, muitas são especulação pura.',
+          'Regra prática: para iniciantes, só BTC e ETH. Altcoins têm risco muito maior.',
+        ],
+      },
+      {
+        type: 'quiz',
+        question: 'Qual é a principal diferença entre Bitcoin e Ethereum?',
+        options: [
+          { id: 'a', text: 'Bitcoin é mais barato que Ethereum', correct: false },
+          { id: 'b', text: 'Bitcoin é reserva de valor; Ethereum é plataforma para contratos e aplicações', correct: true },
+          { id: 'c', text: 'Ethereum foi criado antes do Bitcoin', correct: false },
+          { id: 'd', text: 'São idênticos — só o nome muda', correct: false },
+        ],
+        explanation: 'Bitcoin nasceu como dinheiro digital descentralizado e reserva de valor. Ethereum nasceu como plataforma de computação descentralizada — você pode programar aplicativos que rodam sem servidores centrais.',
+      },
+      {
+        type: 'quiz',
+        question: 'Por que altcoins têm mais risco que BTC e ETH para iniciantes?',
+        options: [
+          { id: 'a', text: 'Porque são ilegais no Brasil', correct: false },
+          { id: 'b', text: 'Porque têm menor liquidez, menos adoção e maior chance de ir a zero', correct: true },
+          { id: 'c', text: 'Porque não são aceitas em exchanges', correct: false },
+          { id: 'd', text: 'Porque rendem menos', correct: false },
+        ],
+        explanation: 'BTC e ETH têm anos de histórico, bilhões em liquidez e adoção global. Altcoins menores podem perder 99% do valor ou simplesmente desaparecer. Para iniciantes, a segurança relativa de BTC/ETH é muito melhor.',
+      },
+    ],
+  },
+
+  '4.3': {
+    id: '4.3', title: 'Como funciona o blockchain', emoji: '⛓️', xpReward: 40,
+    steps: [
+      {
+        type: 'content', emoji: '📒',
+        text: [
+          'Imagine um livro-caixa que registra todas as transações. Mas em vez de um banco guardar esse livro, **milhares de computadores ao redor do mundo** têm uma cópia idêntica.',
+          'Toda nova transação é verificada por esses computadores e adicionada ao livro — de forma permanente e imutável.',
+          'Esse livro descentralizado é o **blockchain**.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '⛓️ Blockchain = cadeia de blocos. Cada bloco contém um conjunto de transações. Uma vez registrado, ninguém consegue apagar ou alterar sem refazer toda a cadeia — computacionalmente impossível.',
+      },
+      {
+        type: 'content', emoji: '🔒',
+        text: [
+          'Por que é seguro?',
+          '**Descentralização:** não tem um servidor central para hackear. Atacar o Bitcoin exigiria controlar mais de 50% de toda a rede mundial.',
+          '**Criptografia:** cada bloco está matematicamente ligado ao anterior. Alterar um bloco invalidaria todos os seguintes.',
+          '**Transparência:** qualquer pessoa pode verificar qualquer transação — tudo é público.',
+        ],
+      },
+      {
+        type: 'content', emoji: '⛏️',
+        text: [
+          'Quem valida as transações são os **mineradores** — computadores que resolvem problemas matemáticos complexos.',
+          'O primeiro a resolver recebe uma recompensa em Bitcoin. Esse processo é chamado de **Proof of Work**.',
+          'Ethereum migrou para **Proof of Stake** — validadores "apostam" suas moedas como garantia, consumindo 99% menos energia.',
+        ],
+      },
+      {
+        type: 'quiz',
+        question: 'O que torna o blockchain praticamente impossível de hackear?',
+        options: [
+          { id: 'a', text: 'Porque é propriedade de uma empresa de segurança', correct: false },
+          { id: 'b', text: 'Porque é descentralizado e cada bloco está criptograficamente ligado ao anterior', correct: true },
+          { id: 'c', text: 'Porque usa senhas muito longas', correct: false },
+          { id: 'd', text: 'Porque o governo protege', correct: false },
+        ],
+        explanation: 'Para alterar uma transação no blockchain você precisaria refazer todos os blocos seguintes E controlar mais de 50% da rede mundial simultaneamente. Com bilhões em poder computacional na rede, isso é economicamente inviável.',
+      },
+      {
+        type: 'quiz',
+        question: 'Qual é o papel dos mineradores no Bitcoin?',
+        options: [
+          { id: 'a', text: 'Criar novos Bitcoins do zero quando quiserem', correct: false },
+          { id: 'b', text: 'Validar transações resolvendo problemas matemáticos e receber BTC como recompensa', correct: true },
+          { id: 'c', text: 'Guardar os Bitcoins dos usuários', correct: false },
+          { id: 'd', text: 'Definir o preço do Bitcoin', correct: false },
+        ],
+        explanation: 'Mineradores são o "sistema nervoso" do Bitcoin. Eles competem para validar blocos de transações — quem resolve primeiro ganha uma recompensa em BTC. Isso incentiva a segurança da rede sem precisar de uma autoridade central.',
+      },
+    ],
+  },
+
+  '4.4': {
+    id: '4.4', title: 'Carteiras e exchanges', emoji: '🔐', xpReward: 35,
+    steps: [
+      {
+        type: 'content', emoji: '🏪',
+        text: [
+          '**Exchange** é onde você compra e vende criptomoedas — como uma corretora, mas para cripto.',
+          'No Brasil as mais usadas são: **Mercado Bitcoin**, **Binance**, **Foxbit**.',
+          'Você cria conta, faz depósito em reais e compra Bitcoin, Ethereum ou outras moedas.',
+        ],
+      },
+      {
+        type: 'content', emoji: '👜',
+        text: [
+          'Depois de comprar, suas criptos ficam na **carteira** da exchange.',
+          'Carteiras têm duas chaves: a **chave pública** (seu endereço — pode compartilhar) e a **chave privada** (sua senha — nunca compartilhe).',
+          'Quem tem a chave privada tem o controle total das criptos. Perdeu a chave privada? Perdeu tudo.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '🔑 "Not your keys, not your coins." Se a exchange for hackeada ou falir, você pode perder tudo. Para valores maiores, use uma carteira própria (hardware wallet).',
+      },
+      {
+        type: 'content', emoji: '🔒',
+        text: [
+          'Tipos de carteira:',
+          '**Custodial (exchange):** a exchange guarda sua chave privada. Mais fácil, mas depende da empresa.',
+          '**Software wallet:** app no celular/computador. Você tem sua chave privada. Ex: MetaMask, Trust Wallet.',
+          '**Hardware wallet:** dispositivo físico (como um pen drive). O mais seguro para valores grandes. Ex: Ledger, Trezor.',
+        ],
+      },
+      {
+        type: 'quiz',
+        question: 'O que é a chave privada de uma carteira de cripto?',
+        options: [
+          { id: 'a', text: 'Seu endereço público para receber criptos', correct: false },
+          { id: 'b', text: 'A senha que dá controle total sobre suas criptomoedas — nunca compartilhe', correct: true },
+          { id: 'c', text: 'O código da exchange onde você opera', correct: false },
+          { id: 'd', text: 'O número da sua conta bancária', correct: false },
+        ],
+        explanation: 'A chave privada é o único acesso real às suas criptomoedas. Quem tem ela pode mover todos os fundos. Perdeu a chave? Perdeu as criptos — não tem suporte, não tem recuperação. Guarde em local seguro, offline.',
+      },
+      {
+        type: 'quiz',
+        question: 'Para um iniciante com pequeno valor em cripto, qual solução é mais prática?',
+        options: [
+          { id: 'a', text: 'Hardware wallet — única opção segura', correct: false },
+          { id: 'b', text: 'Exchange confiável — prática e suficiente para valores pequenos', correct: true },
+          { id: 'c', text: 'Guardar em papel impresso em casa', correct: false },
+          { id: 'd', text: 'Não existe solução segura para cripto', correct: false },
+        ],
+        explanation: 'Para começar com valores pequenos, uma exchange confiável e regulada é suficiente e muito mais prática. Hardware wallets (Ledger, Trezor) fazem mais sentido quando o valor justifica o investimento no dispositivo (~R$ 500).',
+      },
+    ],
+  },
+
+  '4.5': {
+    id: '4.5', title: 'Riscos e como investir com segurança', emoji: '⚠️', xpReward: 45,
+    steps: [
+      {
+        type: 'content', emoji: '📉',
+        text: [
+          'Cripto é o ativo mais volátil do mercado financeiro. Em 2021 o Bitcoin chegou a US$ 69.000. Em 2022 caiu para US$ 16.000. Em 2024 voltou para US$ 100.000.',
+          'Quem comprou no pico em 2021 ficou no prejuízo por anos antes de recuperar.',
+          'Isso é normal em cripto — mas poucos aguentam emocionalmente.',
+        ],
+      },
+      {
+        type: 'content', emoji: '🚨',
+        text: [
+          'Principais riscos em cripto:',
+          '**Volatilidade:** quedas de 50-80% em meses são comuns e esperadas.',
+          '**Golpes:** pirâmides, projetos fraudulentos, "influencers" promovendo moedas para ganhar comissão.',
+          '**Perda de acesso:** esquecer senha, perder chave privada, exchange falindo.',
+          '**Regulação:** governos podem restringir ou proibir — já aconteceu em vários países.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '🚩 Red flags em cripto: promessa de retorno garantido, pressão para investir agora, influencer pedindo para comprar uma moeda específica, projeto sem whitepaper ou time identificado.',
+      },
+      {
+        type: 'content', emoji: '✅',
+        text: [
+          'Como investir em cripto com mais segurança:',
+          '**Alocação pequena:** máximo 5-10% da carteira. Nunca dinheiro que você precisa.',
+          '**Bitcoin e Ethereum apenas:** as mais consolidadas. Fuja de altcoins desconhecidas.',
+          '**DCA (Dollar Cost Average):** comprar um valor fixo todo mês, independente do preço. Reduz o risco de comprar no pico.',
+          '**Exchange regulada:** use plataformas com histórico e regulação. No Brasil: Mercado Bitcoin.',
+        ],
+      },
+      {
+        type: 'quiz',
+        question: 'O Bitcoin caiu 40% em 3 meses. O que a estratégia DCA sugere fazer?',
+        options: [
+          { id: 'a', text: 'Vender tudo antes de cair mais', correct: false },
+          { id: 'b', text: 'Continuar comprando o valor fixo mensal — a queda é parte do plano', correct: true },
+          { id: 'c', text: 'Dobrar o aporte para compensar a perda', correct: false },
+          { id: 'd', text: 'Parar de investir até o preço recuperar', correct: false },
+        ],
+        explanation: 'DCA (Dollar Cost Average) é comprar um valor fixo regularmente, independente do preço. Quando o preço cai, você compra mais unidades pelo mesmo valor. No longo prazo, o preço médio tende a ser melhor que comprar tudo de uma vez.',
+      },
+      {
+        type: 'quiz',
+        question: 'Um influencer diz que uma moeda vai "10x em 30 dias" e pede para você comprar agora. O que isso é?',
+        options: [
+          { id: 'a', text: 'Uma oportunidade real que você não deve perder', correct: false },
+          { id: 'b', text: 'Provavelmente um esquema pump-and-dump — fuja', correct: true },
+          { id: 'c', text: 'Uma análise técnica legítima', correct: false },
+          { id: 'd', text: 'Um sinal de que a moeda é garantida pelo governo', correct: false },
+        ],
+        explanation: 'Pump-and-dump é um esquema clássico: influencers compram uma moeda barata, promovem para seguidores, o preço sobe (pump), eles vendem no topo (dump) e os seguidores ficam com o prejuízo. Nenhum ativo legítimo precisa de pressão para comprar.',
+      },
+    ],
+  },
+
+  '4.boss': {
+    id: '4.boss', title: 'BOSS: Cripto na sua carteira', emoji: '🏆', xpReward: 120,
+    steps: [
+      {
+        type: 'content', emoji: '⚔️',
+        text: [
+          'Boss final da trilha de Cripto. Hora de integrar tudo.',
+          'Cripto é a classe de ativo mais arriscada — mas também a que mais cresceu nas últimas décadas.',
+          'O segredo é usar com **consciência, limitação e estratégia** — não com euforia.',
+        ],
+      },
+      {
+        type: 'content', emoji: '🗂️',
+        text: [
+          'Posição saudável de cripto numa carteira equilibrada:',
+          '**Perfil conservador:** 0-3% — pode ignorar completamente sem problema.',
+          '**Perfil moderado:** 3-7% — só BTC e/ou ETH, via DCA mensal.',
+          '**Perfil arrojado:** 7-15% — BTC + ETH + no máximo 1-2 altcoins de alto cap.',
+        ],
+      },
+      {
+        type: 'callout', variant: 'tip',
+        text: '🎯 Regra simples para cripto: invista só o que você aceita perder 100%. Se uma queda de 80% te faria perder o sono, sua alocação está alta demais.',
+      },
+      {
+        type: 'quiz',
+        question: 'Qual é a estratégia mais indicada para comprar Bitcoin ao longo do tempo?',
+        options: [
+          { id: 'a', text: 'Comprar tudo de uma vez quando achar que está barato', correct: false },
+          { id: 'b', text: 'DCA — valor fixo todo mês, independente do preço', correct: true },
+          { id: 'c', text: 'Esperar o preço cair 50% e então comprar', correct: false },
+          { id: 'd', text: 'Só comprar quando influencers recomendam', correct: false },
+        ],
+        explanation: 'DCA remove a necessidade de "acertar o timing" — algo que nem profissionais conseguem consistentemente. Comprando todo mês, você tem um preço médio equilibrado e evita o erro de comprar no pico.',
+      },
+      {
+        type: 'quiz',
+        question: 'Ana tem perfil moderado e uma carteira de R$ 10.000. Quanto faz sentido alocar em cripto?',
+        options: [
+          { id: 'a', text: 'R$ 5.000 — metade da carteira para crescimento', correct: false },
+          { id: 'b', text: 'R$ 0 — cripto não serve para moderados', correct: false },
+          { id: 'c', text: 'R$ 300-700 (3-7%) — só BTC/ETH via DCA', correct: true },
+          { id: 'd', text: 'R$ 10.000 — todo o dinheiro em cripto', correct: false },
+        ],
+        explanation: 'Para perfil moderado, 3-7% em cripto é o range adequado. Isso permite participar do potencial de crescimento sem colocar em risco o patrimônio principal. Com R$ 10.000, isso significa R$ 300 a R$ 700.',
+      },
+      {
+        type: 'quiz',
+        question: 'Qual desses é o sinal mais confiável para identificar um golpe em cripto?',
+        options: [
+          { id: 'a', text: 'O projeto está listado em exchanges conhecidas', correct: false },
+          { id: 'b', text: 'Promete retorno garantido e pressiona para investir agora', correct: true },
+          { id: 'c', text: 'O preço caiu 30% no último mês', correct: false },
+          { id: 'd', text: 'Não tem app no celular ainda', correct: false },
+        ],
+        explanation: '"Retorno garantido" e "urgência para comprar" são as duas maiores red flags em cripto. Nenhum investimento legítimo garante retorno. A urgência é uma técnica de manipulação para impedir que você pense antes de agir.',
+      },
+    ],
+  },
 }
 
 const FALLBACK_ID = '1.4'
 
 export default function LessonPage() {
-  const { lessonId } = useParams()
+  const { lessonId }     = useParams()
+  const [searchParams]   = useSearchParams()
+  const isReview         = searchParams.get('review') === 'true'
   const { user, updateUser } = useAuth()
   const navigate = useNavigate()
 
@@ -917,17 +1612,20 @@ export default function LessonPage() {
     if (isLast) {
       if (completing) return
       setCompleting(true)
-      try {
-        const { data } = await api.post<User>(
-          `/user/lessons/${lessonId ?? lesson.id}/complete`,
-          { xpReward: lesson.xpReward, trailNumber: 1 }
-        )
-        updateUser(data)
-      } catch {
-        updateUser({
-          totalXp: (user?.totalXp ?? 0) + lesson.xpReward,
-          lessonsCompleted: (user?.lessonsCompleted ?? 0) + 1,
-        })
+      // Modo revisão: não registra conclusão nem XP
+      if (!isReview) {
+        try {
+          const { data } = await api.post<User>(
+            `/user/lessons/${lessonId ?? lesson.id}/complete`,
+            { xpReward: lesson.xpReward, trailNumber: 1 }
+          )
+          updateUser(data)
+        } catch {
+          updateUser({
+            totalXp: (user?.totalXp ?? 0) + lesson.xpReward,
+            lessonsCompleted: (user?.lessonsCompleted ?? 0) + 1,
+          })
+        }
       }
       setFinished(true)
       return
@@ -938,15 +1636,21 @@ export default function LessonPage() {
   if (finished) {
     return (
       <div className="min-h-[80vh] flex flex-col items-center justify-center gap-6 text-center px-4">
-        <span className="text-7xl animate-bounce">🎉</span>
-        <h1 className="text-3xl font-bold text-gray-900">Lição concluída!</h1>
+        <span className="text-7xl animate-bounce">{isReview ? '✅' : '🎉'}</span>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+          {isReview ? 'Revisão concluída!' : 'Lição concluída!'}
+        </h1>
         <p className="text-gray-500">{lesson.title}</p>
-        <div className="badge-xp text-base px-4 py-2">⚡ +{lesson.xpReward} XP</div>
+        {!isReview && <div className="badge-xp text-base px-4 py-2">⚡ +{lesson.xpReward} XP</div>}
+        {isReview && <p className="text-sm text-gray-400">Modo revisão — XP não contabilizado</p>}
         <button
-          onClick={() => { toast.success(`+${lesson.xpReward} XP ganhos!`); navigate('/app/trilhas') }}
+          onClick={() => {
+            if (!isReview) toast.success(`+${lesson.xpReward} XP ganhos!`)
+            navigate('/app/trilhas')
+          }}
           className="btn-primary px-8"
         >
-          Continuar →
+          Voltar às trilhas →
         </button>
       </div>
     )
@@ -967,7 +1671,10 @@ export default function LessonPage() {
             }`} />
           ))}
         </div>
-        <span className="badge-xp">⚡ {lesson.xpReward}</span>
+        {isReview
+          ? <span className="flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-full"><RotateCcw size={12} /> Revisão</span>
+          : <span className="badge-xp">⚡ {lesson.xpReward}</span>
+        }
       </div>
 
       {/* Conteúdo */}

@@ -13,6 +13,8 @@ import SimulatorPage  from './pages/app/SimulatorPage'
 import ProfilePage    from './pages/app/ProfilePage'
 import FinancePage    from './pages/app/FinancePage'
 import AcoesPage      from './pages/app/AcoesPage'
+import GlossaryPage   from './pages/app/GlossaryPage'
+import RankingPage    from './pages/app/RankingPage'
 
 // Layout com sidebar/navbar
 import AppLayout from './components/layout/AppLayout'
@@ -63,6 +65,8 @@ export default function App() {
           <Route path="simulador" element={<SimulatorPage />} />
           <Route path="financas"  element={<FinancePage />} />
           <Route path="acoes"     element={<AcoesPage />} />
+          <Route path="glossario" element={<GlossaryPage />} />
+          <Route path="ranking"   element={<RankingPage />} />
           <Route path="perfil"    element={<ProfilePage />} />
         </Route>
 
