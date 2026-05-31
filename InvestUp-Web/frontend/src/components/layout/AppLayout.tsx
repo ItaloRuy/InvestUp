@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
-  LayoutDashboard, BookOpen, TrendingUp, User, LogOut, Zap, Wallet, BarChart2, Moon, Sun, BookMarked, Trophy
+  LayoutDashboard, BookOpen, TrendingUp, User, LogOut, Zap, Wallet, BarChart2, Moon, Sun, BookMarked, Trophy, Target
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -11,6 +11,7 @@ const NAV = [
   { to: '/app/trilhas',    label: 'Trilhas',   icon: BookOpen },
   { to: '/app/simulador',  label: 'Simulador', icon: TrendingUp },
   { to: '/app/financas',   label: 'Finanças',  icon: Wallet },
+  { to: '/app/metas',      label: 'Metas',     icon: Target },
   { to: '/app/ranking',    label: 'Ranking',   icon: Trophy },
   { to: '/app/glossario',  label: 'Glossário', icon: BookMarked },
   { to: '/app/perfil',     label: 'Perfil',    icon: User },

@@ -89,6 +89,21 @@ db.exec(`
 // ── Adicionar colunas novas sem recriar tabelas
 try { db.exec(`ALTER TABLE users ADD COLUMN avatar_url TEXT`) } catch {}
 try { db.exec(`ALTER TABLE users ADD COLUMN streak_rewarded_at TEXT`) } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN last_activity_at TEXT`) } catch {}
+
+// Nova tabela de metas financeiras
+db.exec(`
+  CREATE TABLE IF NOT EXISTS financial_goals (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id        INTEGER NOT NULL REFERENCES users(id),
+    title          TEXT    NOT NULL,
+    emoji          TEXT    NOT NULL DEFAULT '🎯',
+    target_amount  REAL    NOT NULL,
+    current_amount REAL    NOT NULL DEFAULT 0,
+    deadline       TEXT    NOT NULL,
+    created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+`)
 
 // ── Seed de usuários padrão
 function seedUsers() {
@@ -326,7 +341,7 @@ app.post('/api/user/lessons/:lessonId/complete', requireAuth, (req, res) => {
     `).run(userId, lessonId, trailNumber, xpReward, now, now)
   }
 
-  db.prepare('UPDATE users SET total_xp = total_xp + ?, lessons_completed = lessons_completed + 1 WHERE id = ?')
+  db.prepare("UPDATE users SET total_xp = total_xp + ?, lessons_completed = lessons_completed + 1, last_activity_at = datetime('now') WHERE id = ?")
     .run(xpReward, userId)
 
   const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(userId)
@@ -495,6 +510,74 @@ app.post('/api/user/achievements/:achievement', requireAuth, (req, res) => {
   if (existing) return res.json({ alreadyUnlocked: true })
   db.prepare(`INSERT INTO user_achievements (user_id, achievement) VALUES (?, ?)`).run(req.user.id, achievement)
   res.status(201).json({ achievement, unlockedAt: new Date().toISOString() })
+})
+
+// ══════════════════════════════════════════════
+// STREAK EM RISCO
+// ══════════════════════════════════════════════
+
+// GET /api/user/streak-status
+app.get('/api/user/streak-status', requireAuth, (req, res) => {
+  const today    = new Date().toISOString().slice(0, 10)
+  const lastAct  = req.user.last_activity_at?.slice(0, 10) ?? null
+  const atRisk   = req.user.streak_days > 0 && lastAct !== today
+  const hoursLeft = atRisk ? Math.max(0, 24 - new Date().getHours()) : null
+  res.json({
+    streakDays:   req.user.streak_days,
+    lastActivity: lastAct,
+    atRisk,
+    hoursLeft,
+  })
+})
+
+// ══════════════════════════════════════════════
+// METAS FINANCEIRAS
+// ══════════════════════════════════════════════
+
+// GET /api/user/goals
+app.get('/api/user/goals', requireAuth, (req, res) => {
+  const rows = db.prepare(`
+    SELECT id, title, emoji, target_amount AS targetAmount,
+           current_amount AS currentAmount, deadline, created_at AS createdAt
+    FROM financial_goals WHERE user_id = ? ORDER BY deadline ASC
+  `).all(req.user.id)
+  res.json(rows)
+})
+
+// POST /api/user/goals
+app.post('/api/user/goals', requireAuth, (req, res) => {
+  const { title, emoji = '🎯', target_amount, current_amount = 0, deadline } = req.body
+  if (!title || !target_amount || !deadline) {
+    return res.status(400).json({ error: 'title, target_amount e deadline são obrigatórios' })
+  }
+  const result = db.prepare(`
+    INSERT INTO financial_goals (user_id, title, emoji, target_amount, current_amount, deadline)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(req.user.id, title.trim(), emoji, Number(target_amount), Number(current_amount), deadline)
+  const goal = db.prepare('SELECT id, title, emoji, target_amount AS targetAmount, current_amount AS currentAmount, deadline, created_at AS createdAt FROM financial_goals WHERE id = ?').get(result.lastInsertRowid)
+  res.status(201).json(goal)
+})
+
+// PATCH /api/user/goals/:id — atualiza aporte atual
+app.patch('/api/user/goals/:id', requireAuth, (req, res) => {
+  const { current_amount, title, emoji, target_amount, deadline } = req.body
+  const goal = db.prepare('SELECT id FROM financial_goals WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
+  if (!goal) return res.status(404).json({ error: 'Meta não encontrada' })
+  if (current_amount !== undefined) db.prepare('UPDATE financial_goals SET current_amount = ? WHERE id = ?').run(Number(current_amount), req.params.id)
+  if (title)          db.prepare('UPDATE financial_goals SET title = ? WHERE id = ?').run(title, req.params.id)
+  if (emoji)          db.prepare('UPDATE financial_goals SET emoji = ? WHERE id = ?').run(emoji, req.params.id)
+  if (target_amount)  db.prepare('UPDATE financial_goals SET target_amount = ? WHERE id = ?').run(Number(target_amount), req.params.id)
+  if (deadline)       db.prepare('UPDATE financial_goals SET deadline = ? WHERE id = ?').run(deadline, req.params.id)
+  const updated = db.prepare('SELECT id, title, emoji, target_amount AS targetAmount, current_amount AS currentAmount, deadline, created_at AS createdAt FROM financial_goals WHERE id = ?').get(req.params.id)
+  res.json(updated)
+})
+
+// DELETE /api/user/goals/:id
+app.delete('/api/user/goals/:id', requireAuth, (req, res) => {
+  const goal = db.prepare('SELECT id FROM financial_goals WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
+  if (!goal) return res.status(404).json({ error: 'Meta não encontrada' })
+  db.prepare('DELETE FROM financial_goals WHERE id = ?').run(req.params.id)
+  res.json({ success: true })
 })
 
 // ── Health check

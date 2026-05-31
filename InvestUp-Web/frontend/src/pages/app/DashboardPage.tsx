@@ -1,8 +1,10 @@
 import { useAuth } from '../../contexts/AuthContext'
 import { Link } from 'react-router-dom'
-import { BookOpen, TrendingUp, Zap, Flame, Trophy } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { BookOpen, TrendingUp, Zap, Flame, Trophy, AlertTriangle } from 'lucide-react'
 import MascotTip from '../../components/ui/MascotTip'
 import { getUserBadge } from '../../utils/badges'
+import api from '../../api/client'
 
 const TRAIL_PROGRESS = [
   { id: 1, name: 'Fundamentos', emoji: '🌱', progress: 60, total: 5, done: 3, color: 'bg-primary' },
@@ -27,6 +29,15 @@ function getDashboardTip(xp: number, streak: number, investorProfile: string): s
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const [streakAtRisk, setStreakAtRisk] = useState(false)
+  const [hoursLeft,    setHoursLeft]    = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!user?.streakDays) return
+    api.get<{ atRisk: boolean; hoursLeft: number | null }>('/user/streak-status')
+      .then(({ data }) => { setStreakAtRisk(data.atRisk); setHoursLeft(data.hoursLeft) })
+      .catch(() => {})
+  }, [user?.streakDays])
 
   const badge = getUserBadge({
     xp: user?.totalXp ?? 0,
@@ -54,6 +65,22 @@ export default function DashboardPage() {
             : 'Comece sua jornada de investimentos hoje!'}
         </p>
       </div>
+
+      {/* ── Banner streak em risco */}
+      {streakAtRisk && (
+        <Link to="/app/trilhas" className="flex items-center gap-3 p-4 rounded-2xl bg-orange-50 border-2 border-orange-300 hover:bg-orange-100 transition-colors">
+          <span className="text-2xl animate-pulse">🔥</span>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-orange-700">
+              Seu streak de {user?.streakDays} dias está em risco!
+            </p>
+            <p className="text-xs text-orange-500 mt-0.5">
+              {hoursLeft !== null ? `Faltam ~${hoursLeft}h para perder a sequência.` : 'Faça uma lição hoje para manter.'} Toque para começar.
+            </p>
+          </div>
+          <AlertTriangle size={20} className="text-orange-500 flex-shrink-0" />
+        </Link>
+      )}
 
       {/* ── Mascote com dica cômica + selo atual */}
       <div className="space-y-2">
