@@ -213,12 +213,12 @@ export default function FinancePage() {
       const [expRes, incRes, budRes] = await Promise.all([
         api.get<Expense[]>(`/user/expenses?month=${mk}`),
         api.get<{ amount: number }>(`/user/income?month=${mk}`),
-        api.get<{ category: string; limit: number }[]>(`/user/budget?month=${mk}`),
+        api.get<{ category: string; monthlyLimit: number }[]>(`/user/budget?month=${mk}`),
       ])
       setExpenses(expRes.data)
       setIncome(incRes.data.amount)
       const bmap: Record<string, number> = {}
-      budRes.data.forEach(b => { bmap[b.category] = b.limit })
+      budRes.data.forEach(b => { bmap[b.category] = b.monthlyLimit })
       setBudgets(bmap)
     } catch { /* offline: keep current */ }
     finally { setLoading(false) }

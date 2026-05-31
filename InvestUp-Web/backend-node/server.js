@@ -268,7 +268,7 @@ app.post('/api/auth/login', (req, res) => {
     const alreadyRewarded = user.streak_rewarded_at &&
       user.streak_rewarded_at.slice(0, 10) === new Date().toISOString().slice(0, 10)
     if (!alreadyRewarded) {
-      db.prepare('UPDATE users SET total_xp = total_xp + ?, streak_rewarded_at = datetime("now") WHERE id = ?').run(rewardXp, user.id)
+      db.prepare("UPDATE users SET total_xp = total_xp + ?, streak_rewarded_at = datetime('now') WHERE id = ?").run(rewardXp, user.id)
       streakReward = { xp: rewardXp, days: milestone, message: `🔥 ${milestone} dias seguidos! +${rewardXp} XP bônus!` }
     }
   }
@@ -442,7 +442,7 @@ app.get('/api/ranking', requireAuth, (req, res) => {
 // GET /api/user/budget?month=2026-05
 app.get('/api/user/budget', requireAuth, (req, res) => {
   const month = req.query.month || new Date().toISOString().slice(0, 7)
-  const rows = db.prepare('SELECT category, monthly_limit AS limit FROM budget_goals WHERE user_id = ? AND month = ?').all(req.user.id, month)
+  const rows = db.prepare('SELECT category, monthly_limit AS monthlyLimit FROM budget_goals WHERE user_id = ? AND month = ?').all(req.user.id, month)
   res.json(rows)
 })
 
