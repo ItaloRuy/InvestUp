@@ -185,14 +185,14 @@ function generateTips(expenses: Expense[], income: number): Tip[] {
   return tips
 }
 
-type Tab = 'gastos' | 'carteiras'
+type Tab = 'resumo' | 'gastos' | 'carteiras'
 
 export default function FinancePage() {
   const { user } = useAuth()
   const now = new Date()
   const [year, setYear]   = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
-  const [tab, setTab]     = useState<Tab>('gastos')
+  const [tab, setTab]     = useState<Tab>('resumo')
 
   const mk = monthKey(year, month)
 
@@ -279,16 +279,192 @@ export default function FinancePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 p-1 bg-gray-100 rounded-xl w-fit">
-        {(['gastos', 'carteiras'] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              tab === t ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+      <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+        {([
+          { id: 'resumo',    label: '📊 Resumo'         },
+          { id: 'gastos',    label: '💸 Lançamentos'    },
+          { id: 'carteiras', label: '🏦 Carteiras Modelo'},
+        ] as { id: Tab; label: string }[]).map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              tab === t.id ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}>
-            {t === 'gastos' ? '💸 Meus Gastos' : '📊 Carteiras Modelo'}
+            {t.label}
           </button>
         ))}
       </div>
+
+      {/* ══════ TAB RESUMO ══════ */}
+      {tab === 'resumo' && (
+        <>
+          {/* Seletor de mês */}
+          <div className="flex items-center justify-between">
+            <button onClick={prevMonth} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+              <ChevronLeft size={20} className="text-gray-500" />
+            </button>
+            <span className="font-semibold text-gray-800 dark:text-gray-200 capitalize">{monthLabel}</span>
+            <button onClick={nextMonth} disabled={isNow} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30">
+              <ChevronRight size={20} className="text-gray-500" />
+            </button>
+          </div>
+
+          {/* Cards de resumo */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="card bg-primary-muted border border-primary/20">
+              <p className="text-xs text-gray-500 font-medium">💼 Renda</p>
+              <p className="text-xl font-bold text-primary mt-1">{income > 0 ? fmtBRL(income) : '—'}</p>
+            </div>
+            <div className={`card ${total > income && income > 0 ? 'bg-danger-muted border border-danger/20' : 'bg-gray-50 dark:bg-gray-800'}`}>
+              <p className="text-xs text-gray-500 font-medium">💸 Gastos</p>
+              <p className={`text-xl font-bold mt-1 ${total > income && income > 0 ? 'text-danger' : 'text-gray-900 dark:text-gray-100'}`}>{fmtBRL(total)}</p>
+            </div>
+            <div className={`card ${income > 0 && total < income ? 'bg-success-muted border border-success/20' : 'bg-gray-50 dark:bg-gray-800'}`}>
+              <p className="text-xs text-gray-500 font-medium">💰 Economizado</p>
+              <p className={`text-xl font-bold mt-1 ${income > 0 && total < income ? 'text-success' : 'text-gray-400'}`}>
+                {income > 0 ? fmtBRL(Math.max(0, income - total)) : '—'}
+              </p>
+            </div>
+            <div className="card bg-gray-50 dark:bg-gray-800">
+              <p className="text-xs text-gray-500 font-medium">📊 Taxa poupança</p>
+              <p className={`text-xl font-bold mt-1 ${income > 0 && total < income ? 'text-success' : 'text-gray-400'}`}>
+                {income > 0 ? `${Math.max(0, ((income - total) / income) * 100).toFixed(0)}%` : '—'}
+              </p>
+            </div>
+          </div>
+
+          {total === 0 && (
+            <div className="card text-center py-10 space-y-2">
+              <span className="text-4xl">📊</span>
+              <p className="text-gray-500 font-medium">Nenhum gasto registrado</p>
+              <p className="text-sm text-gray-400">Adicione seus gastos na aba <strong>Lançamentos</strong> para ver o resumo.</p>
+            </div>
+          )}
+
+          {total > 0 && (
+            <>
+              {/* Gráfico de pizza em destaque */}
+              <div className="card">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Onde foi seu dinheiro</h2>
+                <p className="text-xs text-gray-400 mb-3">{CATS.filter(c => byC[c.id] > 0).length} categorias · {fmtBRL(total)} total</p>
+                <ResponsiveContainer width="100%" height={240}>
+                  <PieChart>
+                    <Pie
+                      data={CATS.filter(c => byC[c.id] > 0).map(c => ({
+                        name: `${c.emoji} ${c.label}`,
+                        value: byC[c.id],
+                        pct: ((byC[c.id] / total) * 100).toFixed(1),
+                      }))}
+                      cx="50%" cy="50%" innerRadius={60} outerRadius={90}
+                      paddingAngle={2} dataKey="value"
+                    >
+                      {CATS.filter(c => byC[c.id] > 0).map((cat, i) => (
+                        <Cell key={i} fill={PIE_COLORS[cat.id] ?? '#9CA3AF'} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number, _: string, entry: any) => [`${fmtBRL(v)} (${entry.payload.pct}%)`, entry.name]} />
+                    <Legend iconType="circle" iconSize={8} formatter={(v) => <span className="text-xs text-gray-600 dark:text-gray-400">{v}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Top gastos por categoria */}
+              <div className="card space-y-3">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100">Por categoria</h2>
+                {CATS.filter(c => byC[c.id] > 0)
+                  .sort((a, b) => byC[b.id] - byC[a.id])
+                  .map((cat, i) => {
+                    const amt = byC[cat.id]
+                    const pct = (amt / total) * 100
+                    const budget = budgets[cat.id] ?? 0
+                    const overBudget = budget > 0 && amt > budget
+                    return (
+                      <div key={cat.id} className="flex items-center gap-3">
+                        <span className="text-lg w-6 text-center">{cat.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{cat.label}</span>
+                            <div className="flex items-center gap-1.5">
+                              {overBudget && <span className="text-[10px] text-danger font-bold bg-danger-muted px-1.5 py-0.5 rounded-full">⚠ meta</span>}
+                              <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{fmtBRL(amt)}</span>
+                              <span className="text-xs text-gray-400 w-10 text-right">{pct.toFixed(0)}%</span>
+                            </div>
+                          </div>
+                          <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${overBudget ? 'bg-danger' : cat.bar}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          {budget > 0 && (
+                            <p className="text-[10px] text-gray-400 mt-0.5">
+                              Meta: {fmtBRL(budget)} · {overBudget ? `excedeu ${fmtBRL(amt - budget)}` : `sobram ${fmtBRL(budget - amt)}`}
+                            </p>
+                          )}
+                        </div>
+                        {i === 0 && <span className="text-xs bg-warning/20 text-warning font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">maior</span>}
+                      </div>
+                    )
+                  })}
+              </div>
+
+              {/* Top 3 maiores despesas individuais */}
+              <div className="card space-y-3">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100">Maiores despesas do mês</h2>
+                {[...expenses].sort((a, b) => b.amount - a.amount).slice(0, 5).map((e, i) => {
+                  const cat = CAT_MAP[e.category]
+                  return (
+                    <div key={e.id} className="flex items-center gap-3">
+                      <span className="w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-500 flex-shrink-0">{i + 1}</span>
+                      <span className="text-base">{cat?.emoji ?? '📦'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{e.description}</p>
+                        <p className="text-xs text-gray-400">{cat?.label ?? e.category} · {new Date(e.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</p>
+                      </div>
+                      <span className="text-sm font-bold text-gray-900 dark:text-gray-100 flex-shrink-0">{fmtBRL(e.amount)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Regra 50/30/20 compacta */}
+              {income > 0 && (
+                <div className="card space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">📐 Regra 50 · 30 · 20</h2>
+                    <span className="text-xs text-gray-400">vs. sua renda</span>
+                  </div>
+                  {[
+                    { label: 'Necessidades', cats: ['moradia','alimentacao','transporte','saude'], meta: 50, color: 'bg-blue-400', emoji: '🏠' },
+                    { label: 'Desejos',      cats: ['lazer','outros','educacao'],                  meta: 30, color: 'bg-purple-400', emoji: '🎮' },
+                    { label: 'Investimentos',cats: ['investimento'],                               meta: 20, color: 'bg-primary', emoji: '💰' },
+                  ].map(g => {
+                    const gasto = g.cats.reduce((s, id) => s + (byC[id] ?? 0), 0)
+                    const real  = income > 0 ? (gasto / income) * 100 : 0
+                    const over  = real > g.meta
+                    return (
+                      <div key={g.label}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{g.emoji} {g.label}</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-bold ${over ? 'text-danger' : 'text-gray-600 dark:text-gray-400'}`}>{real.toFixed(0)}%</span>
+                            <span className="text-xs text-gray-400">/ {g.meta}%</span>
+                            {over && <span className="text-[10px] text-danger">▲</span>}
+                          </div>
+                        </div>
+                        <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${over ? 'bg-danger' : g.color}`}
+                            style={{ width: `${Math.min((real / g.meta) * 100, 100)}%` }} />
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{fmtBRL(gasto)} de {fmtBRL(income * g.meta / 100)} ideal</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
 
       {/* ══════ TAB GASTOS ══════ */}
       {tab === 'gastos' && (
