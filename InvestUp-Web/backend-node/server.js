@@ -171,6 +171,7 @@ function userSummary(user) {
     streakDays:       user.streak_days,
     lessonsCompleted: user.lessons_completed,
     investorProfile:  user.investor_profile,
+    avatarUrl:        user.avatar_url ?? null,
   }
 }
 
@@ -341,8 +342,29 @@ app.post('/api/user/lessons/:lessonId/complete', requireAuth, (req, res) => {
     `).run(userId, lessonId, trailNumber, xpReward, now, now)
   }
 
-  db.prepare("UPDATE users SET total_xp = total_xp + ?, lessons_completed = lessons_completed + 1, last_activity_at = datetime('now') WHERE id = ?")
-    .run(xpReward, userId)
+  // ── Atualiza XP, lições e streak
+  const freshUser = db.prepare('SELECT * FROM users WHERE id = ?').get(userId)
+  const today     = new Date().toISOString().slice(0, 10)
+  const lastAct   = freshUser.last_activity_at?.slice(0, 10) ?? null
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+
+  let newStreak
+  if (lastAct === today) {
+    newStreak = freshUser.streak_days           // já jogou hoje, mantém
+  } else if (lastAct === yesterday) {
+    newStreak = freshUser.streak_days + 1       // dia consecutivo, incrementa
+  } else {
+    newStreak = 1                               // quebrou o streak, reinicia
+  }
+
+  db.prepare(`
+    UPDATE users
+    SET total_xp = total_xp + ?,
+        lessons_completed = lessons_completed + 1,
+        last_activity_at = datetime('now'),
+        streak_days = ?
+    WHERE id = ?
+  `).run(xpReward, newStreak, userId)
 
   const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(userId)
   console.log(`✅ Lição ${lessonId} concluída por ${req.user.email} (+${xpReward} XP)`)
@@ -442,7 +464,7 @@ app.get('/api/ranking', requireAuth, (req, res) => {
 // GET /api/user/budget?month=2026-05
 app.get('/api/user/budget', requireAuth, (req, res) => {
   const month = req.query.month || new Date().toISOString().slice(0, 7)
-  const rows = db.prepare('SELECT category, monthly_limit AS monthlyLimit FROM budget_goals WHERE user_id = ? AND month = ?').all(req.user.id, month)
+  const rows = db.prepare('SELECT category, monthly_limit AS monthlyLimit, month FROM budget_goals WHERE user_id = ? AND month = ?').all(req.user.id, month)
   res.json(rows)
 })
 
