@@ -5,6 +5,7 @@ import {
   LayoutDashboard, BookOpen, TrendingUp, User, LogOut, Zap, Wallet, BarChart2, Moon, Sun, BookMarked, Trophy, Target
 } from 'lucide-react'
 import clsx from 'clsx'
+import NotificationBell from '../ui/NotificationBell'
 
 const NAV = [
   { to: '/app',            label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -41,7 +42,10 @@ export default function AppLayout() {
         {user && (
           <div className="px-4 py-4 border-b border-gray-100">
             <div className="bg-primary-muted rounded-xl p-3">
-              <p className="text-sm font-semibold text-primary truncate">{user.name}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-primary truncate">{user.name}</p>
+                <NotificationBell />
+              </div>
               <div className="flex gap-2 mt-1.5">
                 <span className="badge-xp">⚡ {user.totalXp} XP</span>
                 {user.streakDays > 0 && (
@@ -106,6 +110,7 @@ export default function AppLayout() {
                 )}
               </>
             )}
+            <NotificationBell />
             <button onClick={toggleTheme} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
               {theme === 'dark' ? <Sun size={18} className="text-yellow-400" /> : <Moon size={18} className="text-gray-500" />}
             </button>

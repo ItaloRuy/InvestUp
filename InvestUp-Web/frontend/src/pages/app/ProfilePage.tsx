@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { LogOut, Zap, Flame, BookOpen, Trophy, KeyRound, ChevronDown, ChevronUp } from 'lucide-react'
 import { getUserBadge, getAllBadges } from '../../utils/badges'
+import { LEVELS } from '../../utils/levels'
+import LevelBadge from '../../components/ui/LevelBadge'
+import ActivityCalendar from '../../components/ui/ActivityCalendar'
 import MascotTip from '../../components/ui/MascotTip'
 import api from '../../api/client'
 import toast from 'react-hot-toast'
@@ -148,43 +151,28 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* ── Nível e XP */}
-      <div className="card space-y-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Nível atual</p>
-            <p className="text-xl font-bold text-primary">{level.emoji} {level.title}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-gray-500">XP Total</p>
-            <p className="text-2xl font-bold text-gray-900">{user?.totalXp ?? 0}</p>
-          </div>
-        </div>
+      {/* ── Histórico de atividade */}
+      <ActivityCalendar />
 
-        {/* Barra com marcos de nível */}
-        <div>
-          <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-primary to-blue-400 rounded-full transition-all duration-700"
-              style={{ width: `${Math.min(((user?.totalXp ?? 0) / 10000) * 100, 100)}%` }} />
-          </div>
-          {/* Marcos */}
-          <div className="flex justify-between mt-1.5">
-            {[
-              { xp: 0,     emoji: '🌱', label: 'Poupador' },
-              { xp: 200,   emoji: '🔍', label: 'Curioso' },
-              { xp: 500,   emoji: '📚', label: 'Aprendiz' },
-              { xp: 1000,  emoji: '💼', label: 'Investidor' },
-              { xp: 2500,  emoji: '📈', label: 'Trader' },
-              { xp: 5000,  emoji: '🏆', label: 'Mestre' },
-              { xp: 10000, emoji: '👑', label: 'Lenda' },
-            ].map(({ xp, emoji, label }) => {
-              const reached = (user?.totalXp ?? 0) >= xp
+      {/* ── Nível e XP */}
+      <div className="space-y-4">
+        <LevelBadge xp={user?.totalXp ?? 0} />
+
+        {/* Mapa de todos os níveis */}
+        <div className="card space-y-2">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Jornada de níveis</p>
+          <div className="grid grid-cols-3 gap-2">
+            {LEVELS.map(lvl => {
+              const reached = (user?.totalXp ?? 0) >= lvl.minXp
               return (
-                <div key={xp} className="flex flex-col items-center gap-0.5" style={{ width: '14%' }}>
-                  <span className={`text-base ${reached ? '' : 'grayscale opacity-40'}`}>{emoji}</span>
-                  <span className={`text-[9px] text-center leading-tight ${reached ? 'text-primary font-semibold' : 'text-gray-400'}`}>
-                    {label}
-                  </span>
+                <div key={lvl.level} className={`rounded-xl px-3 py-2 border transition-all ${reached ? `${lvl.bg} ${lvl.border}` : 'bg-gray-50 dark:bg-gray-800 border-gray-100 dark:border-gray-700 opacity-50'}`}>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-base ${reached ? '' : 'grayscale'}`}>{lvl.emoji}</span>
+                    <div>
+                      <p className={`text-[11px] font-bold ${reached ? lvl.color : 'text-gray-400'}`}>Nv.{lvl.level} {lvl.title}</p>
+                      <p className="text-[9px] text-gray-400">{lvl.minXp.toLocaleString('pt-BR')} XP</p>
+                    </div>
+                  </div>
                 </div>
               )
             })}
@@ -246,22 +234,41 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* ── Conquistas com data */}
+      {/* ── Conquistas com data + compartilhar */}
       <div>
         <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-3">Conquistas</h2>
         <div className="grid grid-cols-2 gap-3">
           {ACHIEVEMENT_DEFS.map(a => {
             const unlocked = unlockedAchievements.find(u => u.achievement === a.id)
+            function shareAchievement() {
+              const text = `🏆 Acabei de desbloquear a conquista "${a.title}" no InvestUp!\n${a.emoji} ${a.desc}\n\nEstou aprendendo a investir! 📈`
+              if (navigator.share) {
+                navigator.share({ title: 'Conquista InvestUp', text }).catch(() => {})
+              } else {
+                navigator.clipboard.writeText(text).then(() => {
+                  import('react-hot-toast').then(({ default: toast }) => toast.success('Texto copiado!'))
+                }).catch(() => {})
+              }
+            }
             return (
               <div key={a.id} className={`card flex items-start gap-3 transition-all ${unlocked ? '' : 'opacity-40 grayscale'}`}>
                 <span className="text-2xl flex-shrink-0">{a.emoji}</span>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{a.title}</p>
                   <p className="text-xs text-gray-500 truncate">{a.desc}</p>
                   {unlocked && (
-                    <p className="text-[10px] text-success font-semibold mt-0.5">
-                      ✅ {new Date(unlocked.unlockedAt).toLocaleDateString('pt-BR')}
-                    </p>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-[10px] text-success font-semibold">
+                        ✅ {new Date(unlocked.unlockedAt).toLocaleDateString('pt-BR')}
+                      </p>
+                      <button
+                        onClick={shareAchievement}
+                        title="Compartilhar conquista"
+                        className="text-[10px] text-primary hover:text-primary/70 font-semibold transition-colors"
+                      >
+                        Compartilhar
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

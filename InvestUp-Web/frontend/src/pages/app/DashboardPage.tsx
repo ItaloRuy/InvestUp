@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { BookOpen, TrendingUp, Zap, Flame, Trophy, AlertTriangle } from 'lucide-react'
 import MascotTip from '../../components/ui/MascotTip'
+import DailyQuiz from '../../components/ui/DailyQuiz'
+import LevelBadge from '../../components/ui/LevelBadge'
+import WeeklyChallenges from '../../components/ui/WeeklyChallenges'
+import OnboardingTour from '../../components/ui/OnboardingTour'
 import { getUserBadge } from '../../utils/badges'
 import api from '../../api/client'
 
@@ -54,6 +58,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
+      <OnboardingTour />
       {/* ── Saudação */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
@@ -92,16 +97,23 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Cards de stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <StatCard icon={<Zap size={20} className="text-yellow-600" />}
           label="XP Total" value={`${user?.totalXp ?? 0}`} bg="bg-yellow-50" />
         <StatCard icon={<Flame size={20} className="text-orange-500" />}
           label="Streak" value={`${user?.streakDays ?? 0} dias`} bg="bg-orange-50" />
         <StatCard icon={<BookOpen size={20} className="text-primary" />}
           label="Lições" value={`${user?.lessonsCompleted ?? 0}`} bg="bg-primary-muted" />
-        <StatCard icon={<Trophy size={20} className="text-success" />}
-          label="Nível" value={getLevel(user?.totalXp ?? 0)} bg="bg-success-muted" />
       </div>
+
+      {/* ── Nível com barra de progresso */}
+      <LevelBadge xp={user?.totalXp ?? 0} />
+
+      {/* ── Desafios semanais */}
+      <WeeklyChallenges />
+
+      {/* ── Quiz diário */}
+      <DailyQuiz />
 
       {/* ── Missão do dia */}
       <div className="card border border-primary/20 bg-primary-muted">

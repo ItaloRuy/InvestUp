@@ -91,6 +91,31 @@ try { db.exec(`ALTER TABLE users ADD COLUMN avatar_url TEXT`) } catch {}
 try { db.exec(`ALTER TABLE users ADD COLUMN streak_rewarded_at TEXT`) } catch {}
 try { db.exec(`ALTER TABLE users ADD COLUMN last_activity_at TEXT`) } catch {}
 
+// Tabela de despesas recorrentes (templates)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS recurring_expenses (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    category    TEXT    NOT NULL,
+    description TEXT    NOT NULL,
+    amount      REAL    NOT NULL,
+    active      INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+
+// Tabela de respostas do quiz diário
+db.exec(`
+  CREATE TABLE IF NOT EXISTS daily_quiz_answers (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    quiz_date   TEXT NOT NULL,
+    correct     INTEGER NOT NULL DEFAULT 0,
+    answered_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, quiz_date)
+  );
+`)
+
 // Nova tabela de metas financeiras
 db.exec(`
   CREATE TABLE IF NOT EXISTS financial_goals (
@@ -600,6 +625,307 @@ app.delete('/api/user/goals/:id', requireAuth, (req, res) => {
   if (!goal) return res.status(404).json({ error: 'Meta não encontrada' })
   db.prepare('DELETE FROM financial_goals WHERE id = ?').run(req.params.id)
   res.json({ success: true })
+})
+
+// ══════════════════════════════════════════════
+// DESAFIOS SEMANAIS
+// ══════════════════════════════════════════════
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS weekly_challenge_completions (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL REFERENCES users(id),
+    week_key     TEXT    NOT NULL,
+    challenge_id TEXT    NOT NULL,
+    completed_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, week_key, challenge_id)
+  );
+`)
+
+const WEEKLY_CHALLENGES = [
+  { id: 'complete_3_lessons',   title: 'Estude 3 lições',          desc: 'Complete 3 lições em qualquer trilha',  emoji: '📚', xp: 50,  type: 'lessons',  target: 3  },
+  { id: 'log_5_expenses',       title: 'Registre 5 gastos',        desc: 'Adicione 5 lançamentos no controle',   emoji: '💸', xp: 30,  type: 'expenses', target: 5  },
+  { id: '7_day_streak',         title: 'Streak de 7 dias',         desc: 'Mantenha 7 dias consecutivos de acesso', emoji: '🔥', xp: 75,  type: 'streak',   target: 7  },
+  { id: 'complete_quiz',        title: 'Responda o quiz diário',   desc: 'Responda o quiz do dia corretamente',  emoji: '🧠', xp: 25,  type: 'quiz',     target: 1  },
+  { id: 'set_financial_goal',   title: 'Defina uma meta',          desc: 'Crie ou atualize uma meta financeira', emoji: '🎯', xp: 40,  type: 'goals',    target: 1  },
+  { id: 'complete_5_lessons',   title: 'Estude 5 lições',          desc: 'Complete 5 lições em qualquer trilha', emoji: '🏆', xp: 80,  type: 'lessons',  target: 5  },
+  { id: 'use_simulator',        title: 'Use o simulador',          desc: 'Acesse qualquer aba do simulador',     emoji: '📊', xp: 20,  type: 'action',   target: 1  },
+  { id: 'log_income',           title: 'Registre sua renda',       desc: 'Defina sua renda mensal no controle',  emoji: '💼', xp: 20,  type: 'income',   target: 1  },
+]
+
+function getWeekKey() {
+  const d = new Date()
+  const jan1 = new Date(d.getFullYear(), 0, 1)
+  const week = Math.ceil((((d - jan1) / 86400000) + jan1.getDay() + 1) / 7)
+  return `${d.getFullYear()}-W${String(week).padStart(2, '0')}`
+}
+
+function getWeeklyChallenges() {
+  const wk = getWeekKey()
+  const seed = parseInt(wk.replace(/\D/g, ''), 10)
+  const idx1 = seed % WEEKLY_CHALLENGES.length
+  const idx2 = (seed + 2) % WEEKLY_CHALLENGES.length
+  const idx3 = (seed + 5) % WEEKLY_CHALLENGES.length
+  return [WEEKLY_CHALLENGES[idx1], WEEKLY_CHALLENGES[idx2], WEEKLY_CHALLENGES[idx3]]
+}
+
+// GET /api/challenges/weekly
+app.get('/api/challenges/weekly', requireAuth, (req, res) => {
+  const wk = getWeekKey()
+  const challenges = getWeeklyChallenges()
+  const completions = db.prepare('SELECT challenge_id FROM weekly_challenge_completions WHERE user_id = ? AND week_key = ?').all(req.user.id, wk)
+  const completedIds = new Set(completions.map(c => c.challenge_id))
+
+  res.json({
+    weekKey:    wk,
+    challenges: challenges.map(c => ({ ...c, completed: completedIds.has(c.id) })),
+  })
+})
+
+// POST /api/challenges/complete/:id
+app.post('/api/challenges/complete/:id', requireAuth, (req, res) => {
+  const wk = getWeekKey()
+  const challengeId = req.params.id
+  const challenge = WEEKLY_CHALLENGES.find(c => c.id === challengeId)
+  if (!challenge) return res.status(404).json({ error: 'Desafio não encontrado' })
+
+  const exists = db.prepare('SELECT id FROM weekly_challenge_completions WHERE user_id = ? AND week_key = ? AND challenge_id = ?').get(req.user.id, wk, challengeId)
+  if (exists) return res.status(409).json({ error: 'Já completado esta semana' })
+
+  db.prepare('INSERT INTO weekly_challenge_completions (user_id, week_key, challenge_id) VALUES (?, ?, ?)').run(req.user.id, wk, challengeId)
+  db.prepare("UPDATE users SET total_xp = total_xp + ? WHERE id = ?").run(challenge.xp, req.user.id)
+  const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)
+
+  res.json({ success: true, xpEarned: challenge.xp, totalXp: updatedUser.total_xp })
+})
+
+// ══════════════════════════════════════════════
+// DESPESAS RECORRENTES
+// ══════════════════════════════════════════════
+
+// GET /api/user/expenses/recurring
+app.get('/api/user/expenses/recurring', requireAuth, (req, res) => {
+  const rows = db.prepare('SELECT * FROM recurring_expenses WHERE user_id = ? AND active = 1 ORDER BY id DESC').all(req.user.id)
+  res.json(rows)
+})
+
+// POST /api/user/expenses/recurring
+app.post('/api/user/expenses/recurring', requireAuth, (req, res) => {
+  const { category, description, amount } = req.body
+  if (!category || !description || !amount) {
+    return res.status(400).json({ error: 'Campos obrigatórios: category, description, amount' })
+  }
+  const result = db.prepare('INSERT INTO recurring_expenses (user_id, category, description, amount) VALUES (?, ?, ?, ?)').run(req.user.id, category, description.trim(), Number(amount))
+  const row = db.prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(result.lastInsertRowid)
+  res.status(201).json(row)
+})
+
+// DELETE /api/user/expenses/recurring/:id
+app.delete('/api/user/expenses/recurring/:id', requireAuth, (req, res) => {
+  const row = db.prepare('SELECT id FROM recurring_expenses WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id)
+  if (!row) return res.status(404).json({ error: 'Não encontrado' })
+  db.prepare('UPDATE recurring_expenses SET active = 0 WHERE id = ?').run(req.params.id)
+  res.json({ success: true })
+})
+
+// POST /api/user/expenses/apply-recurring — auto-inserir recorrentes no mês
+app.post('/api/user/expenses/apply-recurring', requireAuth, (req, res) => {
+  const { month } = req.body  // ex: '2026-06'
+  if (!month) return res.status(400).json({ error: 'month obrigatório' })
+
+  const templates = db.prepare('SELECT * FROM recurring_expenses WHERE user_id = ? AND active = 1').all(req.user.id)
+  const day1 = `${month}-01`
+  let inserted = 0
+
+  for (const t of templates) {
+    // Verifica se já existe uma despesa recorrente desse template nesse mês
+    const exists = db.prepare(`
+      SELECT id FROM expenses WHERE user_id = ? AND month = ? AND description = ? AND category = ? AND amount = ?
+    `).get(req.user.id, month, t.description, t.category, t.amount)
+    if (!exists) {
+      db.prepare('INSERT INTO expenses (user_id, category, description, amount, expense_date, month) VALUES (?, ?, ?, ?, ?, ?)').run(req.user.id, t.category, t.description, t.amount, day1, month)
+      inserted++
+    }
+  }
+  res.json({ inserted, month })
+})
+
+// ══════════════════════════════════════════════
+// QUIZ DIÁRIO
+// ══════════════════════════════════════════════
+
+const DAILY_QUESTIONS = [
+  {
+    q: 'O que é a taxa Selic?',
+    opts: ['Taxa de câmbio do dólar', 'Taxa básica de juros da economia brasileira', 'Taxa de inflação mensal', 'Taxa de rentabilidade da poupança'],
+    answer: 1,
+    explain: 'A Selic é a taxa básica de juros da economia brasileira, definida pelo Copom (Banco Central). Ela serve de referência para todos os outros juros do país.',
+  },
+  {
+    q: 'O que significa "diversificar" uma carteira de investimentos?',
+    opts: ['Investir tudo em uma única ação', 'Aplicar somente em renda fixa', 'Distribuir o dinheiro em diferentes tipos de ativos', 'Sacar os rendimentos todo mês'],
+    answer: 2,
+    explain: 'Diversificar significa distribuir os investimentos em diferentes classes de ativos (renda fixa, ações, FIIs, etc.) para reduzir o risco total da carteira.',
+  },
+  {
+    q: 'O que é o CDI?',
+    opts: ['Certificado de Depósito Interbancário — taxa usada entre bancos', 'Um título do governo federal', 'Uma moeda digital', 'Uma corretora de valores'],
+    answer: 0,
+    explain: 'O CDI (Certificado de Depósito Interbancário) é a taxa que os bancos usam entre si para empréstimos de curto prazo. Serve de referência para vários investimentos de renda fixa.',
+  },
+  {
+    q: 'O que são "juros compostos"?',
+    opts: ['Juros que pagam somente sobre o capital inicial', 'Juros calculados sobre o valor total, incluindo os juros anteriores', 'Uma taxa fixa paga mensalmente', 'Juros cobrados em parcelamentos'],
+    answer: 1,
+    explain: 'Juros compostos (ou "juros sobre juros") são calculados sobre o saldo total, incluindo os rendimentos acumulados. Com o tempo, criam o efeito bola de neve.',
+  },
+  {
+    q: 'O que é inflação?',
+    opts: ['Aumento do valor dos investimentos', 'Queda generalizada dos preços', 'Aumento generalizado dos preços que reduz o poder de compra', 'Taxa de crescimento do PIB'],
+    answer: 2,
+    explain: 'Inflação é o aumento generalizado e contínuo dos preços de bens e serviços. Ela corrói o poder de compra do dinheiro ao longo do tempo.',
+  },
+  {
+    q: 'Qual é o limite de cobertura do FGC por CPF por instituição?',
+    opts: ['R$ 100.000', 'R$ 250.000', 'R$ 500.000', 'R$ 1.000.000'],
+    answer: 1,
+    explain: 'O Fundo Garantidor de Créditos (FGC) protege até R$ 250.000 por CPF por instituição financeira em caso de falência do banco.',
+  },
+  {
+    q: 'LCI e LCA são isentos de qual imposto para pessoas físicas?',
+    opts: ['IOF', 'Imposto de Renda', 'CSLL', 'COFINS'],
+    answer: 1,
+    explain: 'LCI (Letra de Crédito Imobiliário) e LCA (Letra de Crédito do Agronegócio) são isentos de Imposto de Renda para pessoas físicas, tornando-os competitivos mesmo com taxas menores.',
+  },
+  {
+    q: 'O que é um FII (Fundo de Investimento Imobiliário)?',
+    opts: ['Um fundo que investe em ações de empresas', 'Um fundo que investe em imóveis e distribui rendimentos mensais', 'Um título público do governo', 'Uma conta poupança especial'],
+    answer: 1,
+    explain: 'FIIs são fundos que investem em imóveis (shoppings, escritórios, galpões, etc.) ou ativos imobiliários. Distribuem rendimentos mensais chamados de "dividendos" ou "proventos".',
+  },
+  {
+    q: 'O que significa "renda variável"?',
+    opts: ['Investimentos com rendimento fixo e previsível', 'Investimentos cujo retorno varia conforme o mercado, sem garantia', 'Investimentos somente em imóveis', 'Aplicações com prazo máximo de 1 ano'],
+    answer: 1,
+    explain: 'Renda variável inclui ativos cujo preço oscila conforme o mercado (ações, FIIs, criptos). O retorno não é garantido, mas o potencial de ganho é maior.',
+  },
+  {
+    q: 'O que é o "efeito bola de neve" dos investimentos?',
+    opts: ['A queda acelerada do valor dos ativos', 'O crescimento acelerado do patrimônio graças aos juros compostos', 'A inflação corroendo os rendimentos', 'O aumento das taxas de administração'],
+    answer: 1,
+    explain: 'O efeito bola de neve ocorre quando os rendimentos são reinvestidos e passam a gerar novos rendimentos, acelerando cada vez mais o crescimento do patrimônio.',
+  },
+  {
+    q: 'Qual ativo é considerado o mais seguro do Brasil?',
+    opts: ['Ações da Petrobras', 'Tesouro Selic (título público federal)', 'Bitcoin', 'CDB de banco médio'],
+    answer: 1,
+    explain: 'O Tesouro Direto (especialmente o Tesouro Selic) é considerado o investimento mais seguro do Brasil, pois é garantido pelo governo federal.',
+  },
+  {
+    q: 'O que é "Dividend Yield" (DY)?',
+    opts: ['O preço atual de uma ação', 'A relação entre os dividendos pagos e o preço do ativo', 'A variação diária de um fundo', 'O custo de custódia de um investimento'],
+    answer: 1,
+    explain: 'Dividend Yield é o percentual de dividendos pagos em relação ao preço do ativo. Ex: DY de 1% ao mês significa que o ativo paga 1% do seu valor em dividendos mensalmente.',
+  },
+  {
+    q: 'O que é o "aporte mensal"?',
+    opts: ['O valor inicial investido de uma vez', 'A taxa cobrada pelo banco', 'O valor adicionado regularmente ao investimento todo mês', 'A rentabilidade esperada por mês'],
+    answer: 2,
+    explain: 'Aporte mensal é o valor que você adiciona ao investimento regularmente todo mês. Manter aportes consistentes é um dos hábitos mais importantes para construir patrimônio.',
+  },
+  {
+    q: 'Para qual perfil de investidor a renda fixa é mais adequada?',
+    opts: ['Arrojado', 'Conservador', 'Especulativo', 'Agressivo'],
+    answer: 1,
+    explain: 'O investidor conservador prioriza segurança e previsibilidade. Renda fixa oferece retornos estáveis com baixo risco, sendo ideal para esse perfil.',
+  },
+  {
+    q: 'O que é ETF?',
+    opts: ['Um tipo de conta bancária', 'Um fundo negociado em bolsa que replica um índice', 'Uma criptomoeda', 'Uma taxa de transferência entre bancos'],
+    answer: 1,
+    explain: 'ETF (Exchange-Traded Fund) é um fundo negociado em bolsa que replica a performance de um índice (como o Ibovespa). Permite diversificação com uma única compra e baixo custo.',
+  },
+]
+
+function getTodayDate() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function getDailyQuestion() {
+  const today = getTodayDate()
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000)
+  const idx = dayOfYear % DAILY_QUESTIONS.length
+  return { ...DAILY_QUESTIONS[idx], date: today, index: idx }
+}
+
+// GET /api/quiz/daily
+app.get('/api/quiz/daily', requireAuth, (req, res) => {
+  const today = getTodayDate()
+  const question = getDailyQuestion()
+  const existing = db.prepare('SELECT correct FROM daily_quiz_answers WHERE user_id = ? AND quiz_date = ?').get(req.user.id, today)
+
+  res.json({
+    date:      today,
+    question:  question.q,
+    options:   question.opts,
+    answered:  !!existing,
+    correct:   existing ? !!existing.correct : null,
+    answer:    existing ? question.answer : null,
+    explain:   existing ? question.explain : null,
+    xpReward:  25,
+  })
+})
+
+// POST /api/quiz/answer
+app.post('/api/quiz/answer', requireAuth, (req, res) => {
+  const today    = getTodayDate()
+  const { answer } = req.body
+
+  const existing = db.prepare('SELECT id FROM daily_quiz_answers WHERE user_id = ? AND quiz_date = ?').get(req.user.id, today)
+  if (existing) {
+    return res.status(409).json({ error: 'Quiz já respondido hoje' })
+  }
+
+  const question = getDailyQuestion()
+  const isCorrect = Number(answer) === question.answer
+
+  db.prepare('INSERT INTO daily_quiz_answers (user_id, quiz_date, correct) VALUES (?, ?, ?)').run(req.user.id, today, isCorrect ? 1 : 0)
+
+  if (isCorrect) {
+    db.prepare('UPDATE users SET total_xp = total_xp + 25, last_activity_at = datetime(\'now\') WHERE id = ?').run(req.user.id)
+  }
+
+  const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)
+
+  res.json({
+    correct:  isCorrect,
+    answer:   question.answer,
+    explain:  question.explain,
+    xpEarned: isCorrect ? 25 : 0,
+    totalXp:  updatedUser.total_xp,
+  })
+})
+
+// ── Histórico de atividade
+app.get('/api/user/activity', requireAuth, (req, res) => {
+  const weeks = parseInt(req.query.weeks) || 26
+  const since = new Date()
+  since.setDate(since.getDate() - weeks * 7)
+  const sinceStr = since.toISOString().slice(0, 10)
+
+  // Coleta todas as datas com atividade: lições, despesas, quiz, desafios
+  const lessonDates = db.prepare(`SELECT DATE(completed_at) AS d FROM user_progress WHERE user_id = ? AND completed_at >= ? AND status = 'completed'`).all(req.user.id, sinceStr)
+  const expenseDates = db.prepare(`SELECT DATE(created_at) AS d FROM expenses WHERE user_id = ? AND created_at >= ?`).all(req.user.id, sinceStr)
+  const quizDates = db.prepare(`SELECT quiz_date AS d FROM daily_quiz_answers WHERE user_id = ? AND quiz_date >= ?`).all(req.user.id, sinceStr)
+  const challengeDates = db.prepare(`SELECT DATE(completed_at) AS d FROM weekly_challenge_completions WHERE user_id = ? AND completed_at >= ?`).all(req.user.id, sinceStr)
+
+  // Conta atividades por dia
+  const counts = {}
+  for (const row of [...lessonDates, ...expenseDates, ...quizDates, ...challengeDates]) {
+    if (row.d) counts[row.d] = (counts[row.d] || 0) + 1
+  }
+
+  res.json({ activity: counts, sinceDate: sinceStr })
 })
 
 // ── Health check

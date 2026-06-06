@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Plus, Trash2, ChevronLeft, ChevronRight, Wallet, TrendingDown, Lightbulb, AlertTriangle, CheckCircle, Info } from 'lucide-react'
+import { Plus, Trash2, ChevronLeft, ChevronRight, Wallet, TrendingDown, Lightbulb, AlertTriangle, CheckCircle, Info, Download } from 'lucide-react'
+import { exportFinancePDF } from '../../utils/exportPDF'
+import SpendingAnalysis from '../../components/ui/SpendingAnalysis'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../api/client'
@@ -202,14 +204,20 @@ export default function FinancePage() {
   const [showForm, setShowForm] = useState(false)
   const [budgets, setBudgets]   = useState<Record<string, number>>({})
 
-  const [formCat,    setFormCat]    = useState('alimentacao')
-  const [formDesc,   setFormDesc]   = useState('')
-  const [formAmount, setFormAmount] = useState('')
-  const [formDate,   setFormDate]   = useState(now.toISOString().slice(0, 10))
+  const [formCat,       setFormCat]       = useState('alimentacao')
+  const [formDesc,      setFormDesc]      = useState('')
+  const [formAmount,    setFormAmount]    = useState('')
+  const [formDate,      setFormDate]      = useState(now.toISOString().slice(0, 10))
+  const [formRecurring, setFormRecurring] = useState(false)
+
+  interface RecurringTemplate { id: number; category: string; description: string; amount: number }
+  const [recurringTemplates, setRecurringTemplates] = useState<RecurringTemplate[]>([])
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
+      // Aplica recorrentes antes de carregar
+      await api.post('/user/expenses/apply-recurring', { month: mk }).catch(() => {})
       const [expRes, incRes, budRes] = await Promise.all([
         api.get<Expense[]>(`/user/expenses?month=${mk}`),
         api.get<{ amount: number }>(`/user/income?month=${mk}`),
@@ -231,6 +239,12 @@ export default function FinancePage() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  useEffect(() => {
+    api.get<RecurringTemplate[]>('/user/expenses/recurring')
+      .then(({ data }) => setRecurringTemplates(data))
+      .catch(() => {})
+  }, [])
+
   async function addExpense() {
     const amt = parseFloat(formAmount.replace(',', '.'))
     if (!formDesc.trim() || isNaN(amt) || amt <= 0) return
@@ -239,7 +253,20 @@ export default function FinancePage() {
         category: formCat, description: formDesc.trim(), amount: amt, date: formDate,
       })
       setExpenses(prev => [data, ...prev])
-      setFormDesc(''); setFormAmount(''); setShowForm(false)
+      if (formRecurring) {
+        const { data: tmpl } = await api.post<RecurringTemplate>('/user/expenses/recurring', {
+          category: formCat, description: formDesc.trim(), amount: amt,
+        })
+        setRecurringTemplates(prev => [tmpl, ...prev])
+      }
+      setFormDesc(''); setFormAmount(''); setShowForm(false); setFormRecurring(false)
+    } catch { /* silently ignore */ }
+  }
+
+  async function deleteRecurring(id: number) {
+    try {
+      await api.delete(`/user/expenses/recurring/${id}`)
+      setRecurringTemplates(prev => prev.filter(t => t.id !== id))
     } catch { /* silently ignore */ }
   }
 
@@ -297,15 +324,24 @@ export default function FinancePage() {
       {/* ══════ TAB RESUMO ══════ */}
       {tab === 'resumo' && (
         <>
-          {/* Seletor de mês */}
+          {/* Seletor de mês + botão exportar */}
           <div className="flex items-center justify-between">
             <button onClick={prevMonth} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
               <ChevronLeft size={20} className="text-gray-500" />
             </button>
             <span className="font-semibold text-gray-800 dark:text-gray-200 capitalize">{monthLabel}</span>
-            <button onClick={nextMonth} disabled={isNow} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30">
-              <ChevronRight size={20} className="text-gray-500" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => exportFinancePDF({ monthLabel, income, expenses, budgets, userName: user?.name ?? 'Usuário' })}
+                title="Exportar relatório em PDF"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-primary bg-primary-muted hover:bg-primary/10 transition-colors border border-primary/20"
+              >
+                <Download size={13} /> PDF
+              </button>
+              <button onClick={nextMonth} disabled={isNow} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30">
+                <ChevronRight size={20} className="text-gray-500" />
+              </button>
+            </div>
           </div>
 
           {/* Cards de resumo */}
@@ -331,6 +367,14 @@ export default function FinancePage() {
               </p>
             </div>
           </div>
+
+          {/* Análise comparativa com mês anterior */}
+          <SpendingAnalysis
+            currentExpenses={expenses}
+            currentIncome={income}
+            year={year}
+            month={month + 1}
+          />
 
           {total === 0 && (
             <div className="card text-center py-10 space-y-2">
@@ -645,10 +689,49 @@ export default function FinancePage() {
                   <input type="date" value={formDate} onChange={e => setFormDate(e.target.value)}
                     className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-primary" />
                 </div>
+                {/* Toggle recorrente */}
+                <div className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">🔁 Recorrente todo mês</p>
+                    <p className="text-[10px] text-gray-400">Aparece automaticamente nos próximos meses</p>
+                  </div>
+                  <button
+                    onClick={() => setFormRecurring(v => !v)}
+                    className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${formRecurring ? 'bg-primary' : 'bg-gray-200'}`}
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${formRecurring ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <button onClick={addExpense} className="btn-primary flex-1 py-2 text-sm">Salvar</button>
-                  <button onClick={() => setShowForm(false)} className="flex-1 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">Cancelar</button>
+                  <button onClick={() => { setShowForm(false); setFormRecurring(false) }} className="flex-1 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50">Cancelar</button>
                 </div>
+              </div>
+            )}
+
+            {/* Painel de despesas recorrentes */}
+            {recurringTemplates.length > 0 && (
+              <div className="card space-y-2 border border-primary/20 bg-primary-muted/40">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-primary">🔁 Recorrentes ativos ({recurringTemplates.length})</p>
+                  <p className="text-[10px] text-gray-400">Inseridos automaticamente todo mês</p>
+                </div>
+                {recurringTemplates.map(t => {
+                  const cat = CAT_MAP[t.category]
+                  return (
+                    <div key={t.id} className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-3 py-2">
+                      <span className="text-base">{cat?.emoji ?? '📦'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{t.description}</p>
+                        <p className="text-[10px] text-gray-400">{cat?.label}</p>
+                      </div>
+                      <p className="text-xs font-bold text-gray-700 dark:text-gray-300 flex-shrink-0">{fmtBRL(t.amount)}</p>
+                      <button onClick={() => deleteRecurring(t.id)} className="p-1 text-gray-300 hover:text-danger transition-colors">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  )
+                })}
               </div>
             )}
 

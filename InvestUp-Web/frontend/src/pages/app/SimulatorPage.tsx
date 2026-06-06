@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 
 // ─── Tipos e constantes compartilhados
-type Tab = 'crescimento' | 'comparar' | 'meta' | 'dividendos'
+type Tab = 'crescimento' | 'comparar' | 'meta' | 'dividendos' | 'rendafixa' | 'fire'
 
 const ASSET_CLASSES = [
   { key: 'fixo',          label: 'Renda Fixa',     emoji: '🏦', rate: 10.5, color: 'bg-blue-400',   textColor: 'text-blue-700',   bg: 'bg-blue-50'   },
@@ -114,7 +114,7 @@ function ModelSelector({ selected, onSelect, customAllocation, onCustomChange }:
       </div>
       <div className="space-y-3 pt-1">
         {ASSET_CLASSES.map(asset => {
-          const pct = activeAllocation[asset.key] ?? 0
+          const pct = (activeAllocation as Record<string, number>)[asset.key] ?? 0
           return (
             <div key={asset.key}>
               <div className="flex items-center justify-between mb-1">
@@ -132,7 +132,7 @@ function ModelSelector({ selected, onSelect, customAllocation, onCustomChange }:
                   aria-label={asset.label} />
               ) : (
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full transition-all duration-500 ${asset.color}`} style={{ width: `${pct}%` }} />
+                  <div className={`h-full rounded-full transition-all duration-500 ${asset.color}`} style={{ width: `${(activeAllocation as Record<string, number>)[asset.key] ?? 0}%` }} />
                 </div>
               )}
             </div>
@@ -497,16 +497,328 @@ function TabDividendos() {
 }
 
 // ══════════════════════════════════════════════
+// ABA 5 — Renda Fixa (CDB / Tesouro / LCI / LCA)
+// ══════════════════════════════════════════════
+
+// Tabela regressiva de IR para renda fixa
+function calcIR(months: number): number {
+  if (months <= 6)  return 0.225
+  if (months <= 12) return 0.20
+  if (months <= 24) return 0.175
+  return 0.15
+}
+
+type RFProduct = {
+  key: string
+  label: string
+  emoji: string
+  color: string
+  textColor: string
+  bg: string
+  isento: boolean // isento de IR (LCI/LCA)
+  defaultRate: number
+  desc: string
+}
+
+const RF_PRODUCTS: RFProduct[] = [
+  { key: 'cdb',      label: 'CDB',          emoji: '🏦', color: 'bg-blue-500',   textColor: 'text-blue-700',   bg: 'bg-blue-50',   isento: false, defaultRate: 12.5, desc: 'Certificado de Depósito Bancário' },
+  { key: 'tesouro',  label: 'Tesouro Selic', emoji: '🏛️', color: 'bg-green-500',  textColor: 'text-green-700',  bg: 'bg-green-50',  isento: false, defaultRate: 11.0, desc: 'Título público federal' },
+  { key: 'lci',      label: 'LCI',          emoji: '🏠', color: 'bg-purple-500', textColor: 'text-purple-700', bg: 'bg-purple-50', isento: true,  defaultRate: 10.0, desc: 'Letra de Crédito Imobiliário — isento IR' },
+  { key: 'lca',      label: 'LCA',          emoji: '🌾', color: 'bg-orange-500', textColor: 'text-orange-700', bg: 'bg-orange-50', isento: true,  defaultRate: 9.8,  desc: 'Letra de Crédito Agro — isento IR' },
+]
+
+function calcRF(principal: number, annualRate: number, months: number, isento: boolean) {
+  const r = Math.pow(1 + annualRate / 100, months / 12) - 1
+  const gross = principal * r
+  const ir = isento ? 0 : gross * calcIR(months)
+  const net = gross - ir
+  return { gross, ir, net, total: principal + net, netRate: (net / principal) * 100 }
+}
+
+function TabRendaFixa() {
+  const [principal, setPrincipal] = useState(5000)
+  const [months,    setMonths]    = useState(12)
+  const [rates,     setRates]     = useState<Record<string, number>>(
+    Object.fromEntries(RF_PRODUCTS.map(p => [p.key, p.defaultRate]))
+  )
+
+  const irAliquota = calcIR(months)
+  const results = RF_PRODUCTS.map(p => ({ ...p, ...calcRF(principal, rates[p.key], months, p.isento) }))
+  const best = results.reduce((a, b) => (b.net > a.net ? b : a))
+
+  return (
+    <div className="space-y-6">
+      {/* Configuração */}
+      <div className="card space-y-5">
+        <h2 className="font-semibold text-gray-900 dark:text-gray-100">Configure seu investimento</h2>
+        <SliderField
+          label="Valor investido"
+          value={principal} min={500} max={100000} step={500}
+          format={formatBRL} onChange={setPrincipal}
+        />
+        <SliderField
+          label="Prazo"
+          value={months} min={1} max={60} step={1}
+          format={v => `${v} ${v === 1 ? 'mês' : 'meses'}`} onChange={setMonths}
+        />
+        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl px-4 py-2.5 flex items-center gap-2">
+          <span className="text-base">📋</span>
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            IR aplicável neste prazo: <strong>{(irAliquota * 100).toFixed(1)}%</strong> sobre os rendimentos
+            {months > 24 ? ' (alíquota mínima — acima de 24 meses)' : months > 12 ? ' (entre 13 e 24 meses)' : months > 6 ? ' (entre 7 e 12 meses)' : ' (até 6 meses — alíquota máxima)'}
+          </p>
+        </div>
+      </div>
+
+      {/* Taxas editáveis por produto */}
+      <div className="card space-y-4">
+        <h2 className="font-semibold text-gray-900 dark:text-gray-100">Taxas anuais (personalize)</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {RF_PRODUCTS.map(p => (
+            <div key={p.key} className={`rounded-xl p-3 ${p.bg} dark:bg-opacity-10`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{p.emoji}</span>
+                  <div>
+                    <p className={`text-sm font-bold ${p.textColor}`}>{p.label}</p>
+                    <p className="text-[10px] text-gray-500">{p.desc}</p>
+                  </div>
+                </div>
+                {p.isento && (
+                  <span className="text-[10px] font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">isento IR</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1} max={30} step={0.1}
+                  value={rates[p.key]}
+                  onChange={e => setRates(r => ({ ...r, [p.key]: Number(e.target.value) }))}
+                  className={`w-24 text-sm font-bold text-center rounded-lg border-2 border-transparent focus:outline-none focus:border-current px-2 py-1 ${p.textColor} ${p.bg}`}
+                  aria-label={`Taxa ${p.label}`}
+                />
+                <span className={`text-sm font-semibold ${p.textColor}`}>% a.a.</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Comparação lado a lado */}
+      <div className="card space-y-4">
+        <h2 className="font-semibold text-gray-900 dark:text-gray-100">Comparativo de resultados</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {results.map(r => {
+            const isBest = r.key === best.key
+            return (
+              <div key={r.key}
+                className={`rounded-2xl p-4 border-2 transition-all ${isBest ? 'border-success bg-success-muted' : 'border-gray-100 bg-gray-50 dark:bg-gray-800 dark:border-gray-700'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{r.emoji}</span>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{r.label}</p>
+                      <p className="text-[10px] text-gray-500">{rates[r.key]}% a.a.</p>
+                    </div>
+                  </div>
+                  {isBest && <span className="text-[10px] font-bold text-success bg-green-100 px-2 py-0.5 rounded-full">Melhor opção</span>}
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Rendimento bruto</span>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{formatBRL(r.gross)}</span>
+                  </div>
+                  {!r.isento && (
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Imposto de Renda ({(irAliquota * 100).toFixed(1)}%)</span>
+                      <span className="font-medium text-red-500">− {formatBRL(r.ir)}</span>
+                    </div>
+                  )}
+                  {r.isento && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-green-600">Isento de IR</span>
+                      <span className="font-medium text-green-600">R$ 0,00</span>
+                    </div>
+                  )}
+                  <div className="border-t border-gray-200 dark:border-gray-600 pt-1.5 flex justify-between">
+                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Valor líquido final</span>
+                    <span className={`text-sm font-bold ${isBest ? 'text-success' : 'text-gray-800 dark:text-gray-200'}`}>{formatBRL(r.total)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-400">
+                    <span>Rentabilidade líquida</span>
+                    <span className="font-semibold text-gray-600 dark:text-gray-300">{r.netRate.toFixed(2)}%</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Resumo */}
+      <div className="card bg-primary-muted border border-primary/20">
+        <p className="text-sm text-gray-700 dark:text-gray-300">
+          💡 Para <strong>{formatBRL(principal)}</strong> investidos por <strong>{months} {months === 1 ? 'mês' : 'meses'}</strong>,
+          a melhor opção é o <strong>{best.label}</strong> com rendimento líquido de <strong>{formatBRL(best.net)}</strong>{' '}
+          ({best.netRate.toFixed(2)}% no período).
+          {best.isento
+            ? ' Por ser isento de IR, compensa mesmo com taxa menor.'
+            : ` Após desconto de ${(irAliquota * 100).toFixed(1)}% de IR sobre os rendimentos.`}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════
+// ABA 6 — Calculadora FIRE (Independência Financeira)
+// ══════════════════════════════════════════════
+function TabFIRE() {
+  const [monthlyExpenses, setMonthlyExpenses] = useState(3000)
+  const [currentAssets,   setCurrentAssets]   = useState(0)
+  const [monthlySavings,  setMonthlySavings]  = useState(1000)
+  const [annualReturn,    setAnnualReturn]     = useState(10)
+  const [safeRate,        setSafeRate]         = useState(4)   // regra dos X%
+
+  // Patrimônio necessário = gastos anuais / taxa de retirada
+  const annualExpenses  = monthlyExpenses * 12
+  const fireNumber      = annualExpenses / (safeRate / 100)
+
+  // Simulação mês a mês até atingir FIRE
+  const monthlyRate = Math.pow(1 + annualReturn / 100, 1 / 12) - 1
+  let projectionData: { year: number; assets: number; fire: number }[] = []
+  let patrimony = currentAssets
+  let fireYear  = null as number | null
+
+  for (let m = 0; m <= 600; m++) {
+    if (m % 12 === 0) {
+      projectionData.push({ year: m / 12, assets: Math.round(patrimony), fire: Math.round(fireNumber) })
+      if (patrimony >= fireNumber && fireYear === null) fireYear = m / 12
+    }
+    if (fireYear !== null && m > (fireYear + 10) * 12) break
+    patrimony = patrimony * (1 + monthlyRate) + monthlySavings
+  }
+
+  const remaining   = Math.max(0, fireNumber - currentAssets)
+  const passiveIncome = fireNumber * (safeRate / 100) / 12
+
+  return (
+    <div className="space-y-6">
+      {/* Explicação */}
+      <div className="card bg-primary-muted border border-primary/20 space-y-1">
+        <p className="text-sm font-bold text-primary">🔥 O que é FIRE?</p>
+        <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+          <strong>Financial Independence, Retire Early.</strong> A regra dos {safeRate}% diz: acumule um patrimônio equivalente a
+          {' '}{100 / safeRate}× seus gastos anuais. Com isso, você pode viver dos rendimentos indefinidamente retirando {safeRate}% ao ano.
+        </p>
+      </div>
+
+      {/* Inputs */}
+      <div className="card space-y-5">
+        <h2 className="font-semibold text-gray-900 dark:text-gray-100">Seus dados</h2>
+        <SliderField label="Gastos mensais" value={monthlyExpenses} min={500} max={20000} step={500} format={formatBRL} onChange={setMonthlyExpenses} />
+        <SliderField label="Aporte mensal" value={monthlySavings} min={0} max={10000} step={100} format={formatBRL} onChange={setMonthlySavings} />
+        <SliderField label="Patrimônio atual" value={currentAssets} min={0} max={2000000} step={5000} format={formatBRL} onChange={setCurrentAssets} />
+        <SliderField label="Retorno anual esperado" value={annualReturn} min={4} max={20} step={0.5} format={v => `${v}% a.a.`} onChange={setAnnualReturn} />
+
+        {/* Taxa de retirada segura */}
+        <div>
+          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Taxa de retirada segura</p>
+          <div className="flex gap-2">
+            {[3, 3.5, 4, 4.5, 5].map(r => (
+              <button key={r} onClick={() => setSafeRate(r)}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${safeRate === r ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 dark:text-gray-400 dark:border-gray-600'}`}>
+                {r}%
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">
+            {safeRate <= 3.5 ? 'Ultra conservadora — probabilidade >99% de não quebrar.' :
+             safeRate === 4   ? 'Regra clássica dos 4% (estudo Trinity, S&P 500, 30 anos).' :
+             'Mais agressiva — menor margem de segurança.'}
+          </p>
+        </div>
+      </div>
+
+      {/* Número FIRE em destaque */}
+      <div className="card bg-primary border-0 text-center space-y-2 py-6">
+        <p className="text-sm text-blue-200 font-medium">Seu número FIRE</p>
+        <p className="text-4xl font-bold text-white">{formatBRL(fireNumber)}</p>
+        <p className="text-xs text-blue-200">
+          {monthlyExpenses > 0
+            ? `= ${(100 / safeRate)}× seus gastos anuais (${formatBRL(annualExpenses)}/ano)`
+            : 'Configure seus gastos acima'}
+        </p>
+      </div>
+
+      {/* Cards de resultado */}
+      <div className="grid grid-cols-2 gap-3">
+        <ResultCard label="Renda passiva mensal" value={formatBRL(passiveIncome)} color="text-success" highlight />
+        <ResultCard label="Patrimônio atual" value={formatBRL(currentAssets)} color="text-primary" />
+        <ResultCard label="Falta acumular" value={formatBRL(remaining)} color="text-gray-700 dark:text-gray-300" />
+        <ResultCard
+          label={fireYear !== null ? 'Anos até FIRE' : 'Projeção'}
+          value={fireYear !== null ? `${fireYear.toFixed(1)} anos` : '> 50 anos'}
+          color={fireYear !== null && fireYear <= 20 ? 'text-success' : 'text-orange-500'}
+        />
+      </div>
+
+      {/* Gráfico de projeção */}
+      {projectionData.length > 1 && (
+        <div className="card">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Jornada até a independência financeira</h2>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={projectionData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="year" tickFormatter={v => `${v}a`} tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
+              <Tooltip
+                formatter={(value: number, name: string) => [formatBRL(value), name]}
+                labelFormatter={l => `Ano ${l}`}
+              />
+              <Legend />
+              <Line type="monotone" dataKey="assets" name="Seu patrimônio" stroke="#1E3A5F" strokeWidth={2.5} dot={false} />
+              <Line type="monotone" dataKey="fire"   name="Número FIRE"    stroke="#00A86B" strokeWidth={2} strokeDasharray="6 3" dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+          {fireYear !== null && (
+            <p className="text-xs text-center text-gray-500 mt-2">
+              As duas linhas se cruzam no ano <strong>{fireYear.toFixed(1)}</strong> — sua independência financeira!
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Insight */}
+      <div className="card bg-success-muted border border-success/20">
+        <p className="text-sm text-gray-700 dark:text-gray-300">
+          {fireYear !== null
+            ? fireYear <= 10
+              ? `🚀 Impressionante! Com esse ritmo você alcança a IF em apenas ${fireYear.toFixed(1)} anos. Renda passiva de ${formatBRL(passiveIncome)}/mês.`
+              : fireYear <= 20
+              ? `🎯 Em ${fireYear.toFixed(1)} anos você terá ${formatBRL(fireNumber)} gerando ${formatBRL(passiveIncome)}/mês — suficiente para cobrir todos os seus gastos.`
+              : `📈 Em ${fireYear.toFixed(1)} anos você atinge o FIRE. Aumentar o aporte mensal ou reduzir gastos acelera esse prazo significativamente.`
+            : `⚠️ Com os dados atuais o FIRE leva mais de 50 anos. Considere aumentar o aporte mensal ou o retorno esperado.`
+          }
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════
 // PÁGINA PRINCIPAL
 // ══════════════════════════════════════════════
 export default function SimulatorPage() {
   const [tab, setTab] = useState<Tab>('crescimento')
 
   const tabs: { id: Tab; label: string; emoji: string }[] = [
-    { id: 'crescimento', label: 'Crescimento',    emoji: '📈' },
-    { id: 'comparar',    label: 'Comparar',        emoji: '⚖️' },
-    { id: 'meta',        label: 'Meta',            emoji: '🎯' },
-    { id: 'dividendos',  label: 'Renda Passiva',   emoji: '💰' },
+    { id: 'crescimento', label: 'Crescimento',  emoji: '📈' },
+    { id: 'comparar',    label: 'Comparar',     emoji: '⚖️' },
+    { id: 'meta',        label: 'Meta',         emoji: '🎯' },
+    { id: 'dividendos',  label: 'Renda Passiva', emoji: '💰' },
+    { id: 'rendafixa',   label: 'Renda Fixa',   emoji: '🏦' },
+    { id: 'fire',        label: 'FIRE',         emoji: '🔥' },
   ]
 
   return (
@@ -533,6 +845,8 @@ export default function SimulatorPage() {
       {tab === 'comparar'    && <TabComparar />}
       {tab === 'meta'        && <TabMeta />}
       {tab === 'dividendos'  && <TabDividendos />}
+      {tab === 'rendafixa'   && <TabRendaFixa />}
+      {tab === 'fire'        && <TabFIRE />}
     </div>
   )
 }
